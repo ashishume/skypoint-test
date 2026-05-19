@@ -15,6 +15,7 @@ describe("JobForm", () => {
 
     await user.type(screen.getByPlaceholderText("Job title"), "Platform Engineer");
     await user.type(screen.getByPlaceholderText("Location"), "Remote");
+    await user.type(screen.getByPlaceholderText("React, Python, Product Strategy"), "AWS, Terraform");
     await user.type(screen.getByPlaceholderText("Minimum salary"), "100000");
     await user.type(screen.getByPlaceholderText("Maximum salary"), "200000");
     await user.type(
@@ -26,6 +27,7 @@ describe("JobForm", () => {
     expect(onSubmit).toHaveBeenCalledWith({
       title: "Platform Engineer",
       description: "Build deployment systems for the hiring platform.",
+      skills: ["AWS", "Terraform"],
       location: "Remote",
       job_type: "full_time",
       salary_min: 100000,

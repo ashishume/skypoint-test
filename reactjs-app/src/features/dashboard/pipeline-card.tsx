@@ -19,7 +19,7 @@ export function PipelineCard({ application, isHighlighted }: PipelineCardProps) 
 
   return (
     <Link
-      to={`/hr/jobs?jobId=${application.job.id}&applicationStatus=${application.status}`}
+      to={`/hr/jobs/${application.job.id}?applicationStatus=${application.status}`}
       className="block rounded-md outline-none focus-visible:ring-2 focus-visible:ring-blue-700 focus-visible:ring-offset-2"
     >
       <motion.article

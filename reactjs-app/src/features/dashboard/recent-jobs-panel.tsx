@@ -33,7 +33,7 @@ function RecentJobRow({ job, index }: { job: Job; index: number }) {
   const Icon = index % 2 === 0 ? Code2 : Megaphone;
 
   return (
-    <Link to="/hr/jobs" className="group flex items-center justify-between gap-4 px-4 py-4 transition-colors hover:bg-slate-50 sm:px-5">
+    <Link to={`/hr/jobs/${job.id}`} className="group flex items-center justify-between gap-4 px-4 py-4 transition-colors hover:bg-slate-50 sm:px-5">
       <div className="flex min-w-0 items-center gap-4">
         <span className="grid h-12 w-12 shrink-0 place-items-center rounded-md bg-slate-100 text-blue-700">
           <Icon className="h-5 w-5" />

@@ -30,6 +30,7 @@ const candidateNav = [
 
 const candidateSideNav = [
   { to: "/candidate/jobs", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/candidate/jobs?searchMode=1", label: "Active Searches", icon: Search },
   { to: "/candidate/applications", label: "Applications", icon: ClipboardList },
   { to: "/candidate/profile", label: "Profile", icon: UserRound },
 ];
@@ -122,22 +123,29 @@ export function AppLayout() {
           </div>
         </div>
         <nav className="flex gap-1 overflow-x-auto px-4 py-2 md:hidden">
-          {(isHr ? sideNav.filter((item) => item.enabled) : candidateSideNav).map(({ to, label, icon: Icon }) => (
-            <NavLink
-              key={label}
-              to={to}
-              end={to === "/hr"}
-              className={({ isActive }) =>
-                cn(
+          {(isHr ? sideNav.filter((item) => item.enabled) : candidateSideNav).map(({ to, label, icon: Icon }) => {
+            const isActive = (() => {
+              if (to === "/hr") return location.pathname === "/hr";
+              if (to === "/candidate/jobs") {
+                return location.pathname === "/candidate/jobs" && !location.search.includes("searchMode=1");
+              }
+              if (to.includes("?")) return `${location.pathname}${location.search}` === to;
+              return location.pathname.startsWith(to);
+            })();
+            return (
+              <Link
+                key={label}
+                to={to}
+                className={cn(
                   "inline-flex h-9 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-semibold text-slate-600",
                   isActive && "bg-blue-700 text-white"
-                )
-              }
-            >
-              <Icon className="h-4 w-4" />
-              {label}
-            </NavLink>
-          ))}
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {label}
+              </Link>
+            );
+          })}
         </nav>
       </header>
 
@@ -148,7 +156,14 @@ export function AppLayout() {
           </div>
           <nav className="flex-1 space-y-3">
             {(isHr ? sideNav : candidateSideNav).map(({ to, label, icon: Icon }) => {
-              const isActive = to === "/hr" ? location.pathname === "/hr" : location.pathname.startsWith(to);
+              const isActive = (() => {
+                if (to === "/hr") return location.pathname === "/hr";
+                if (to === "/candidate/jobs") {
+                  return location.pathname === "/candidate/jobs" && !location.search.includes("searchMode=1");
+                }
+                if (to.includes("?")) return `${location.pathname}${location.search}` === to;
+                return location.pathname.startsWith(to);
+              })();
               const content = (
                 <>
                   <Icon className="h-5 w-5" />

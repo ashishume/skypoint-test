@@ -1,14 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Edit, FileText, Plus, Search, Trash2, X } from "lucide-react";
+import { Edit, Eye, FileText, Plus, Search, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { applicationsApi, getApiError, jobsApi } from "@/api/client";
-import type { ApplicationStatus, ApplicationWithCandidate, Job, JobPayload, JobStatus } from "@/api/types";
+import type { ApplicationStatus, Job, JobPayload, JobStatus } from "@/api/types";
 import { EmptyState } from "@/components/common/empty-state";
 import { PaginationControls } from "@/components/common/pagination-controls";
 import { PageHeader } from "@/components/common/page-header";
-import { ApplicationStatusBadge } from "@/components/common/status-badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -26,10 +25,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ApplicantsTable } from "@/features/jobs/applicants-table";
 import { JobForm } from "@/features/jobs/job-form";
 import { JobCard } from "@/features/jobs/job-card";
-import { applicationStatusLabels, formatDate, jobStatusLabels } from "@/lib/format";
+import { applicationStatusLabels, jobStatusLabels } from "@/lib/format";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 
 const applicationStatuses = Object.keys(applicationStatusLabels) as ApplicationStatus[];
@@ -263,8 +262,15 @@ export default function HrJobsPage() {
                 <JobCard
                   key={job.id}
                   job={job}
+                  showApplicantsCount
                   actions={
                     <div className="grid w-full grid-cols-2 gap-2">
+                      <Button type="button" variant="outline" asChild>
+                        <Link to={`/hr/jobs/${job.id}`}>
+                          <Eye className="h-4 w-4" />
+                          Details
+                        </Link>
+                      </Button>
                       <Button
                         type="button"
                         variant="outline"
@@ -273,22 +279,21 @@ export default function HrJobsPage() {
                           updateParams({ jobId: String(job.id) });
                         }}
                       >
-                      <FileText className="h-4 w-4" />
-                      Applicants
+                        <FileText className="h-4 w-4" />
+                        Applicants
                       </Button>
                       <Button type="button" variant="outline" onClick={() => setEditingJob(job)}>
-                      <Edit className="h-4 w-4" />
-                      Edit
+                        <Edit className="h-4 w-4" />
+                        Edit
                       </Button>
                       <Button
-                      type="button"
-                      variant="destructive"
-                      className="col-span-2"
-                      onClick={() => confirmDelete(job)}
-                      disabled={deleteMutation.isPending}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Delete
+                        type="button"
+                        variant="destructive"
+                        onClick={() => confirmDelete(job)}
+                        disabled={deleteMutation.isPending}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Delete
                       </Button>
                     </div>
                   }
@@ -364,95 +369,5 @@ export default function HrJobsPage() {
         </DialogContent>
       </Dialog>
     </>
-  );
-}
-
-function ApplicantsTable({
-  page,
-  isLoading,
-  onPageChange,
-  onStatusChange,
-}: {
-  page?: { items: ApplicationWithCandidate[]; total: number; limit: number; offset: number };
-  isLoading: boolean;
-  onPageChange: (page: number) => void;
-  onStatusChange: (application: ApplicationWithCandidate, status: ApplicationStatus) => void;
-}) {
-  if (isLoading) return <Skeleton className="h-72 rounded-lg" />;
-  const applications = page?.items ?? [];
-
-  return (
-    <div className="space-y-4">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Candidate</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Applied</TableHead>
-            <TableHead>Resume</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {applications.map((application) => (
-            <TableRow key={application.id}>
-              <TableCell>
-                <div className="font-medium">{application.candidate.full_name}</div>
-                <div className="text-xs text-muted-foreground">{application.candidate.email}</div>
-              </TableCell>
-              <TableCell>
-                <div className="flex min-w-40 flex-col gap-2">
-                  <ApplicationStatusBadge status={application.status} />
-                  <Select
-                    value={application.status}
-                    onValueChange={(value) => onStatusChange(application, value as ApplicationStatus)}
-                  >
-                    <SelectTrigger className="h-8">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {applicationStatuses.map((status) => (
-                        <SelectItem key={status} value={status}>
-                          {applicationStatusLabels[status]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </TableCell>
-              <TableCell className="text-muted-foreground">{formatDate(application.created_at)}</TableCell>
-              <TableCell>
-                {application.resume_url ? (
-                  <a
-                    href={application.resume_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-sm font-medium text-primary hover:underline"
-                  >
-                    Open
-                  </a>
-                ) : (
-                  <span className="text-sm text-muted-foreground">Not provided</span>
-                )}
-              </TableCell>
-            </TableRow>
-          ))}
-          {!applications.length ? (
-            <TableRow>
-              <TableCell colSpan={4} className="text-center text-muted-foreground">
-                No applications for this role yet.
-              </TableCell>
-            </TableRow>
-          ) : null}
-        </TableBody>
-      </Table>
-      {page ? (
-        <PaginationControls
-          limit={page.limit}
-          offset={page.offset}
-          total={page.total}
-          onPageChange={onPageChange}
-        />
-      ) : null}
-    </div>
   );
 }

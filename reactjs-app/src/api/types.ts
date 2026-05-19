@@ -38,12 +38,14 @@ export interface Job {
   id: number;
   title: string;
   description: string;
+  skills: string[];
   location: string;
   job_type: JobType;
   salary_min: number | null;
   salary_max: number | null;
   status: JobStatus;
   created_by_id: number;
+  applications_count: number;
   created_at: string;
   updated_at: string;
 }
@@ -51,6 +53,7 @@ export interface Job {
 export interface JobPayload {
   title: string;
   description: string;
+  skills: string[];
   location: string;
   job_type: JobType;
   salary_min?: number | null;
@@ -64,6 +67,10 @@ export interface CandidateProfile {
   resume_url: string | null;
   skills: string[];
   work_experience: string;
+  salary_min: number | null;
+  salary_max: number | null;
+  experience_years: number;
+  preferred_roles: string[];
   profile_strength: number;
   created_at: string;
   updated_at: string;
@@ -73,6 +80,10 @@ export interface CandidateProfilePayload {
   resume_url?: string | null;
   skills: string[];
   work_experience: string;
+  salary_min?: number | null;
+  salary_max?: number | null;
+  experience_years: number;
+  preferred_roles: string[];
 }
 
 export interface Application {

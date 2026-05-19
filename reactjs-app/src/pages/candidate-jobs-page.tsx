@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Send } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { applicationsApi, candidateProfileApi, getApiError, jobsApi } from "@/api/client";
 import type { ApplicationWithJob, Job, JobRecommendation } from "@/api/types";
@@ -38,10 +39,13 @@ export default function CandidateJobsPage() {
   const [filters, setFilters] = useState({ keyword: "", location: "", salaryRange: "any" });
   const [page, setPage] = useState(1);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const debouncedKeyword = useDebouncedValue(draftKeyword.trim(), 350);
   const debouncedLocation = useDebouncedValue(draftLocation.trim(), 350);
   const debouncedSalaryRange = useDebouncedValue(draftSalaryRange, 350);
+  const isActiveSearchRoute = searchParams.get("searchMode") === "1";
+  const hasActiveSearch = isActiveSearchRoute || Boolean(filters.keyword || filters.location || filters.salaryRange !== "any");
 
   useEffect(() => {
     setPage(1);
@@ -67,6 +71,7 @@ export default function CandidateJobsPage() {
         limit: JOBS_PAGE_SIZE,
         offset: (page - 1) * JOBS_PAGE_SIZE,
       }),
+    enabled: hasActiveSearch,
     placeholderData: (previous) => previous,
   });
   const profileQuery = useQuery({
@@ -84,7 +89,16 @@ export default function CandidateJobsPage() {
 
   const recommendations = useMemo(() => {
     const profile = profileQuery.data;
-    if (!profile?.skills.length && !profile?.work_experience.trim()) return [];
+    if (
+      !profile?.skills.length &&
+      !profile?.work_experience.trim() &&
+      !profile?.salary_min &&
+      !profile?.salary_max &&
+      !profile?.experience_years &&
+      !profile?.preferred_roles.length
+    ) {
+      return [];
+    }
     return recommendationsQuery.data ?? [];
   }, [profileQuery.data, recommendationsQuery.data]);
 
@@ -101,6 +115,7 @@ export default function CandidateJobsPage() {
   });
 
   function applyFilters() {
+    setSearchParams({ searchMode: "1" }, { replace: true });
     setFilters({
       keyword: draftKeyword.trim(),
       location: draftLocation.trim(),
@@ -126,62 +141,29 @@ export default function CandidateJobsPage() {
           onSearch={applyFilters}
         />
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="space-y-8">
-            <ActiveApplications applications={applicationsQuery.data?.items ?? []} isLoading={applicationsQuery.isLoading} />
-            <RecommendedJobs
-              recommendations={recommendations}
-              isLoading={recommendationsQuery.isLoading || profileQuery.isLoading}
-              onApply={setSelectedJob}
-            />
-            <section className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold tracking-tight">Search Results</h2>
-                {jobsQuery.data ? (
-                  <span className="text-sm font-semibold text-muted-foreground">{jobsQuery.data.total} roles found</span>
-                ) : null}
-              </div>
-              {jobsQuery.isLoading ? (
-                <div className="grid gap-4 md:grid-cols-2">
-                  {Array.from({ length: 4 }).map((_, index) => (
-                    <Skeleton key={index} className="h-72 rounded-lg" />
-                  ))}
-                </div>
-              ) : jobsQuery.data?.items.length ? (
-                <>
-                  <motion.div layout className="grid gap-4 md:grid-cols-2">
-                    {jobsQuery.data.items.map((job) => (
-                      <motion.div key={job.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-                        <JobCard
-                          job={job}
-                          actions={
-                            <Button type="button" onClick={() => setSelectedJob(job)} className="w-full">
-                              <Send className="h-4 w-4" />
-                              Apply
-                            </Button>
-                          }
-                        />
-                      </motion.div>
-                    ))}
-                  </motion.div>
-                  <PaginationControls
-                    limit={jobsQuery.data.limit}
-                    offset={jobsQuery.data.offset}
-                    total={jobsQuery.data.total}
-                    onPageChange={setPage}
-                  />
-                </>
-              ) : (
-                <EmptyState
-                  icon={Send}
-                  title="No roles found"
-                  description="Try a broader keyword, location, or salary range."
-                />
-              )}
-            </section>
+        {hasActiveSearch ? (
+          <SearchResults
+            isLoading={jobsQuery.isLoading}
+            jobs={jobsQuery.data?.items ?? []}
+            total={jobsQuery.data?.total}
+            limit={jobsQuery.data?.limit}
+            offset={jobsQuery.data?.offset}
+            onPageChange={setPage}
+            onApply={setSelectedJob}
+          />
+        ) : (
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+            <div className="space-y-8">
+              <ActiveApplications applications={applicationsQuery.data?.items ?? []} isLoading={applicationsQuery.isLoading} />
+              <RecommendedJobs
+                recommendations={recommendations}
+                isLoading={recommendationsQuery.isLoading || profileQuery.isLoading}
+                onApply={setSelectedJob}
+              />
+            </div>
+            <ProfileStrengthCard profile={profileQuery.data} />
           </div>
-          <ProfileStrengthCard profile={profileQuery.data} />
-        </div>
+        )}
       </section>
       <Dialog open={Boolean(selectedJob)} onOpenChange={(open) => !open && setSelectedJob(null)}>
         <DialogContent>
@@ -193,6 +175,70 @@ export default function CandidateJobsPage() {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+function SearchResults({
+  isLoading,
+  jobs,
+  total,
+  limit,
+  offset,
+  onPageChange,
+  onApply,
+}: {
+  isLoading: boolean;
+  jobs: Job[];
+  total?: number;
+  limit?: number;
+  offset?: number;
+  onPageChange: (page: number) => void;
+  onApply: (job: Job) => void;
+}) {
+  return (
+    <section className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold tracking-tight">Search Results</h2>
+        {typeof total === "number" ? (
+          <span className="text-sm font-semibold text-muted-foreground">{total} roles found</span>
+        ) : null}
+      </div>
+      {isLoading ? (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <Skeleton key={index} className="h-72 rounded-lg" />
+          ))}
+        </div>
+      ) : jobs.length ? (
+        <>
+          <motion.div layout className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {jobs.map((job) => (
+              <motion.div key={job.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+                <JobCard
+                  job={job}
+                  href={`/candidate/jobs/${job.id}`}
+                  actions={
+                    <Button type="button" onClick={() => onApply(job)} className="w-full">
+                      <Send className="h-4 w-4" />
+                      Apply
+                    </Button>
+                  }
+                />
+              </motion.div>
+            ))}
+          </motion.div>
+          {typeof total === "number" && typeof limit === "number" && typeof offset === "number" ? (
+            <PaginationControls limit={limit} offset={offset} total={total} onPageChange={onPageChange} />
+          ) : null}
+        </>
+      ) : (
+        <EmptyState
+          icon={Send}
+          title="No roles found"
+          description="Try a broader keyword, location, or salary range."
+        />
+      )}
+    </section>
   );
 }
 
@@ -260,6 +306,7 @@ function RecommendedJobs({
             <JobCard
               key={recommendation.job.id}
               job={recommendation.job}
+              href={`/candidate/jobs/${recommendation.job.id}`}
               actions={
                 <div className="w-full space-y-3">
                   <div className="flex items-center justify-between text-xs font-bold text-blue-700">

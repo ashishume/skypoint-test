@@ -20,6 +20,7 @@ const jobSchema = z
   .object({
     title: z.string().trim().min(2, "Title must be at least 2 characters."),
     description: z.string().trim().min(10, "Description must be at least 10 characters."),
+    skills: z.string().trim().optional(),
     location: z.string().trim().min(1, "Location is required."),
     job_type: z.enum(["full_time", "part_time", "contract", "internship"]),
     salary_min: z.coerce.number().int().min(0).optional().or(z.literal("")),
@@ -59,6 +60,7 @@ export function JobForm({ job, isSubmitting, submitLabel, onSubmit }: JobFormPro
     defaultValues: {
       title: "",
       description: "",
+      skills: "",
       location: "",
       job_type: "full_time",
       salary_min: "",
@@ -72,6 +74,7 @@ export function JobForm({ job, isSubmitting, submitLabel, onSubmit }: JobFormPro
       reset({
         title: job.title,
         description: job.description,
+        skills: job.skills.join(", "),
         location: job.location,
         job_type: job.job_type,
         salary_min: job.salary_min ?? "",
@@ -82,8 +85,14 @@ export function JobForm({ job, isSubmitting, submitLabel, onSubmit }: JobFormPro
   }, [job, reset]);
 
   function submit(values: JobFormValues) {
+    const skills = (values.skills ?? "")
+      .split(",")
+      .map((skill) => skill.trim())
+      .filter(Boolean);
+
     onSubmit({
       ...values,
+      skills,
       salary_min: values.salary_min === "" ? null : values.salary_min,
       salary_max: values.salary_max === "" ? null : values.salary_max,
     });
@@ -149,6 +158,12 @@ export function JobForm({ job, isSubmitting, submitLabel, onSubmit }: JobFormPro
       </div>
       <FormField label="Description" error={errors.description?.message} required>
         <Textarea rows={7} placeholder="Describe the role, expectations, and team..." {...register("description")} />
+      </FormField>
+      <FormField label="Skills" error={errors.skills?.message}>
+        <Input placeholder="React, Python, Product Strategy" {...register("skills")} />
+        <p className="mt-1 text-xs font-medium text-muted-foreground">
+          Separate skills with commas. These are used for candidate recommendations.
+        </p>
       </FormField>
       <Button type="submit" className="w-full sm:w-auto" disabled={isSubmitting}>
         {submitLabel}

@@ -30,6 +30,7 @@ class JobPosting(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(primary_key=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     description: Mapped[str] = mapped_column(Text, nullable=False)
+    skills: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
     location: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     job_type: Mapped[JobType] = mapped_column(
         Enum(JobType, native_enum=False, length=20, validate_strings=True),
@@ -56,6 +57,10 @@ class JobPosting(Base, TimestampMixin):
         back_populates="job",
         cascade="all, delete-orphan",
     )
+
+    @property
+    def applications_count(self) -> int:
+        return len(self.applications)
 
     __table_args__ = (
         Index("ix_job_postings_status_created", "status", "created_at"),

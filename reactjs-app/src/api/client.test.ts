@@ -92,6 +92,7 @@ describe("api client", () => {
     await jobsApi.create({
       title: "Role",
       description: "A useful role description.",
+      skills: ["react"],
       location: "Remote",
       job_type: "full_time",
     });

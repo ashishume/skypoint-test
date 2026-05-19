@@ -35,6 +35,7 @@ class JobRepository(BaseRepository[JobPosting]):
                 or_(
                     JobPosting.title.ilike(term),
                     JobPosting.description.ilike(term),
+                    JobPosting.skills.ilike(term),
                     JobPosting.location.ilike(term),
                 )
             )

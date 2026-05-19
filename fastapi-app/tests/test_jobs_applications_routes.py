@@ -22,6 +22,7 @@ def job_payload(**overrides):
     payload = {
         "title": "Backend Engineer",
         "description": "Build reliable APIs for hiring teams.",
+        "skills": ["python", "fastapi", "postgresql"],
         "location": "Remote",
         "job_type": "full_time",
         "salary_min": 100000,
@@ -40,10 +41,12 @@ def create_job(
     status: JobStatus = JobStatus.OPEN,
     job_type: JobType = JobType.FULL_TIME,
     location: str = "Remote",
+    skills: list[str] | None = None,
 ) -> JobPosting:
     job = JobPosting(
         title=title,
         description="Build reliable APIs for hiring teams.",
+        skills=", ".join(skills or ["python", "fastapi"]),
         location=location,
         job_type=job_type,
         salary_min=100000,
@@ -84,8 +87,10 @@ class TestJobRoutes:
         assert response.status_code == 201
         data = response.json()
         assert data["title"] == "Backend Engineer"
+        assert data["skills"] == ["python", "fastapi", "postgresql"]
         assert data["status"] == "open"
         assert data["job_type"] == "full_time"
+        assert data["applications_count"] == 0
 
     def test_candidate_cannot_create_job(self, client: TestClient, candidate_token: str):
         response = client.post(JOBS, json=job_payload(), headers=auth_header(candidate_token))
@@ -118,6 +123,23 @@ class TestJobRoutes:
         assert body["total"] == 1
         assert body["items"][0]["title"] == "Open API Engineer"
 
+    def test_hr_job_list_includes_applicant_counts(
+        self,
+        client: TestClient,
+        db: Session,
+        hr_user: User,
+        candidate_user: User,
+        hr_token: str,
+    ):
+        job = create_job(db, hr_user, title="Applicant Count Engineer")
+        create_application(db, job, candidate_user)
+
+        response = client.get(JOBS, headers=auth_header(hr_token))
+
+        assert response.status_code == 200
+        listed_job = next(item for item in response.json()["items"] if item["id"] == job.id)
+        assert listed_job["applications_count"] == 1
+
     def test_hr_can_search_and_filter_jobs(
         self,
         client: TestClient,
@@ -129,7 +151,8 @@ class TestJobRoutes:
         create_job(db, hr_user, title="Design Lead", location="Bangalore", job_type=JobType.CONTRACT)
 
         description_match = create_job(db, hr_user, title="Frontend Developer", location="Pune")
-        description_match.description = "Build reliable backend APIs for candidates."
+        description_match.description = "Build reliable APIs for candidates."
+        description_match.skills = "backend, typescript"
         db.commit()
 
         response = client.get(
@@ -318,8 +341,8 @@ class TestApplicationRoutes:
         hr_user: User,
         candidate_token: str,
     ):
-        create_job(db, hr_user, title="React Product Engineer", location="Remote")
-        create_job(db, hr_user, title="Payroll Analyst", location="Remote")
+        create_job(db, hr_user, title="React Product Engineer", location="Remote", skills=["react", "product"])
+        create_job(db, hr_user, title="Payroll Analyst", location="Remote", skills=["payroll", "excel"])
 
         update_response = client.put(
             CANDIDATE_PROFILE,
@@ -327,6 +350,10 @@ class TestApplicationRoutes:
                 "resume_url": "https://example.com/resume.pdf",
                 "skills": ["React", "Product", "React"],
                 "work_experience": "Built React product dashboards for hiring teams.",
+                "salary_min": 100000,
+                "salary_max": 200000,
+                "experience_years": 5,
+                "preferred_roles": ["React Product Engineer"],
             },
             headers=auth_header(candidate_token),
         )
@@ -337,6 +364,9 @@ class TestApplicationRoutes:
 
         assert update_response.status_code == 200
         assert update_response.json()["skills"] == ["react", "product"]
+        assert update_response.json()["salary_min"] == 100000
+        assert update_response.json()["experience_years"] == 5
+        assert update_response.json()["preferred_roles"] == ["react product engineer"]
         assert update_response.json()["profile_strength"] == 100
         assert recommendations_response.status_code == 200
         recommendations = recommendations_response.json()

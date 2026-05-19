@@ -11,10 +11,12 @@ export function ProfileStrengthCard({ profile }: ProfileStrengthCardProps) {
   const hasResume = Boolean(profile?.resume_url);
   const hasSkills = Boolean(profile?.skills.length);
   const hasExperience = Boolean(profile?.work_experience.trim());
+  const hasSalary = Boolean(profile?.salary_min || profile?.salary_max);
+  const hasPreferences = Boolean(profile?.experience_years || profile?.preferred_roles.length);
   const strength = profile?.profile_strength ?? 0;
 
   return (
-    <section className="rounded-lg bg-[#1e293b] p-5 text-white shadow-md">
+    <section className="self-start rounded-lg bg-[#1e293b] p-5 text-white shadow-md xl:sticky xl:top-24">
       <div className="mb-5 flex items-center justify-between">
         <h2 className="text-lg font-bold">Profile Strength</h2>
         <span className="text-xl font-bold">{strength}%</span>
@@ -29,6 +31,8 @@ export function ProfileStrengthCard({ profile }: ProfileStrengthCardProps) {
         <ChecklistItem complete={hasResume} label="Upload resume" />
         <ChecklistItem complete={hasSkills} label="Add skills" />
         <ChecklistItem complete={hasExperience} label="Add work experience" />
+        <ChecklistItem complete={hasSalary} label="Add salary range" />
+        <ChecklistItem complete={hasPreferences} label="Add role preferences" />
       </div>
       <Button asChild className="w-full rounded-md bg-white text-[#091426] hover:bg-slate-100">
         <Link to="/candidate/profile">Complete Profile</Link>

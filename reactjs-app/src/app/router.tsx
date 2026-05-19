@@ -7,9 +7,11 @@ import type { UserRole } from "@/api/types";
 
 const AuthPage = lazy(() => import("@/pages/auth-page"));
 const CandidateJobsPage = lazy(() => import("@/pages/candidate-jobs-page"));
+const CandidateJobDetailsPage = lazy(() => import("@/pages/candidate-job-details-page"));
 const CandidateApplicationsPage = lazy(() => import("@/pages/candidate-applications-page"));
 const CandidateProfilePage = lazy(() => import("@/pages/candidate-profile-page"));
 const HrDashboardPage = lazy(() => import("@/pages/hr-dashboard-page"));
+const HrJobDetailsPage = lazy(() => import("@/pages/hr-job-details-page"));
 const HrJobsPage = lazy(() => import("@/pages/hr-jobs-page"));
 
 function PageLoader() {
@@ -51,6 +53,7 @@ export function AppRouter() {
         <Route element={<ProtectedRoute role="candidate" />}>
           <Route element={<AppLayout />}>
             <Route path="/candidate/jobs" element={<CandidateJobsPage />} />
+            <Route path="/candidate/jobs/:jobId" element={<CandidateJobDetailsPage />} />
             <Route path="/candidate/applications" element={<CandidateApplicationsPage />} />
             <Route path="/candidate/profile" element={<CandidateProfilePage />} />
           </Route>
@@ -59,6 +62,7 @@ export function AppRouter() {
           <Route element={<AppLayout />}>
             <Route path="/hr" element={<HrDashboardPage />} />
             <Route path="/hr/jobs" element={<HrJobsPage />} />
+            <Route path="/hr/jobs/:jobId" element={<HrJobDetailsPage />} />
           </Route>
         </Route>
         <Route path="*" element={<RootRedirect />} />
