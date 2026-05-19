@@ -133,9 +133,6 @@ class ApplicationRepository(BaseRepository[Application]):
             counts[status] = int(count)
         return counts
 
-    def total_count(self) -> int:
-        return int(self.db.execute(select(func.count(Application.id))).scalar_one())
-
     def recent(self, *, limit: int = 10) -> List[Application]:
         stmt = (
             select(Application)

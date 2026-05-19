@@ -101,10 +101,6 @@ export interface ApplicationWithJob extends Application {
   job: Job;
 }
 
-export interface ApplicationWithCandidate extends Application {
-  candidate: PublicUser;
-}
-
 export interface ApplicationWithJobAndCandidate extends ApplicationWithJob {
   candidate: PublicUser;
 }

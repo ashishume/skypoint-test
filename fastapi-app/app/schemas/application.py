@@ -39,12 +39,6 @@ class ApplicationWithJob(ApplicationResponse):
     job: JobResponse
 
 
-class ApplicationWithCandidate(ApplicationResponse):
-    """Returned to HR so they see who applied."""
-
-    candidate: UserPublic
-
-
 class ApplicationWithJobAndCandidate(ApplicationWithJob):
     """Returned to HR dashboards so recent applications include context."""
 

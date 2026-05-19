@@ -261,10 +261,10 @@ All secrets and tunables come from environment variables — no hardcoded values
 
 | File | Tracked in git? | Purpose |
 |---|---|---|
-| `.env.example` (root) | Yes | Template documenting every variable |
-| `fastapi-app/.env.example` | Yes | Backend-only template |
+| `.env.example` (root) | Yes | Single template documenting Docker Compose, backend, database, and seed variables |
 | `.env` (root) | **No** (gitignored) | Optional local overrides; Docker Compose also works without it |
-| `fastapi-app/.env` | **No** (gitignored) | Loaded by pydantic-settings for local uvicorn runs |
+
+The backend also reads the root `.env` when run locally from `fastapi-app/`, so no separate `fastapi-app/.env` file is needed.
 
 ### Key variables
 
@@ -386,13 +386,12 @@ The seeded workspace also includes demo jobs, a candidate profile, one applicati
 
 ```
 skypoint-test/
-├── .env.example                # Root env template (docker-compose vars)
+├── .env.example                # Single env template for Docker + backend settings
 ├── .gitignore
 ├── docker-compose.yml          # db + backend + frontend orchestration
 ├── README.md
 │
 ├── fastapi-app/
-│   ├── .env.example
 │   ├── .dockerignore
 │   ├── Dockerfile              # Multi-stage, non-root user, curl healthcheck
 │   ├── entrypoint.sh           # alembic upgrade head → uvicorn (N workers)
@@ -542,7 +541,7 @@ npm install
 npm run test:coverage
 ```
 
-Latest local result: **18 passed**, with a V8 coverage report emitted to `reactjs-app/coverage/`.
+Latest local result: **17 passed**, with a V8 coverage report emitted to `reactjs-app/coverage/`.
 
 ---
 

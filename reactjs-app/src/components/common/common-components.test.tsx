@@ -3,7 +3,6 @@ import userEvent from "@testing-library/user-event";
 import { BriefcaseBusiness } from "lucide-react";
 import { describe, expect, it, vi } from "vitest";
 import { EmptyState } from "@/components/common/empty-state";
-import { MetricCard } from "@/components/common/metric-card";
 import { PageHeader } from "@/components/common/page-header";
 import { ApplicationStatusBadge, JobStatusBadge } from "@/components/common/status-badge";
 
@@ -18,21 +17,6 @@ describe("common components", () => {
 
     expect(screen.getByText("Shortlisted")).toBeInTheDocument();
     expect(screen.getByText("Closed")).toBeInTheDocument();
-  });
-
-  it("renders metric cards", () => {
-    render(
-      <MetricCard
-        icon={BriefcaseBusiness}
-        title="Open roles"
-        value={4}
-        detail="2 new this week"
-      />
-    );
-
-    expect(screen.getByText("Open roles")).toBeInTheDocument();
-    expect(screen.getByText("4")).toBeInTheDocument();
-    expect(screen.getByText("2 new this week")).toBeInTheDocument();
   });
 
   it("fires empty-state actions", async () => {

@@ -64,6 +64,11 @@ services:
   frontend:
     build:
       context: ./reactjs-app
+      args:
+        VITE_DEMO_HR_EMAIL: ${SEED_HR_EMAIL:-admin@test.com}
+        VITE_DEMO_HR_PASSWORD: ${SEED_HR_PASSWORD:-Admin@1234}
+        VITE_DEMO_CANDIDATE_EMAIL: ${SEED_CANDIDATE_EMAIL:-user@test.com}
+        VITE_DEMO_CANDIDATE_PASSWORD: ${SEED_CANDIDATE_PASSWORD:-User@1234}
     container_name: recruitflow_frontend
     ports:
       - "${FRONTEND_PORT:-5173}:80"
