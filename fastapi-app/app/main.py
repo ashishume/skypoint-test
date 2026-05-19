@@ -1,4 +1,4 @@
-"""FastAPI application factory and global error handlers."""
+"""FastAPI application factory, lifespan, and global error handlers."""
 import logging
 from contextlib import asynccontextmanager
 
@@ -10,8 +10,12 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.config import settings
+from app.core.exceptions import DomainError, UnauthorizedError
 from app.database import engine
+from app.routers import applications as applications_router
 from app.routers import auth as auth_router
+from app.routers import hr as hr_router
+from app.routers import jobs as jobs_router
 from app.seed import seed_database
 
 logging.basicConfig(
@@ -51,6 +55,28 @@ def create_app() -> FastAPI:
         allow_headers=["Authorization", "Content-Type"],
     )
 
+    _register_exception_handlers(application)
+    _register_routers(application)
+
+    @application.get("/health", tags=["Health"])
+    def health() -> dict:
+        return {"status": "healthy", "service": settings.APP_NAME}
+
+    return application
+
+
+def _register_exception_handlers(application: FastAPI) -> None:
+    @application.exception_handler(DomainError)
+    async def _domain_error_handler(request: Request, exc: DomainError):
+        headers = {}
+        if isinstance(exc, UnauthorizedError):
+            headers["WWW-Authenticate"] = "Bearer"
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.message},
+            headers=headers,
+        )
+
     @application.exception_handler(SQLAlchemyError)
     async def _db_error_handler(request: Request, exc: SQLAlchemyError):
         logger.exception("Database error at %s %s", request.method, request.url.path)
@@ -66,17 +92,15 @@ def create_app() -> FastAPI:
             content={"detail": jsonable_encoder(exc.errors())},
         )
 
+
+def _register_routers(application: FastAPI) -> None:
+    prefix = settings.API_V1_PREFIX
+    application.include_router(auth_router.router, prefix=f"{prefix}/auth", tags=["Authentication"])
+    application.include_router(jobs_router.router, prefix=f"{prefix}/jobs", tags=["Jobs"])
     application.include_router(
-        auth_router.router,
-        prefix=f"{settings.API_V1_PREFIX}/auth",
-        tags=["Authentication"],
+        applications_router.router, prefix=f"{prefix}/applications", tags=["Applications"]
     )
-
-    @application.get("/health", tags=["Health"])
-    def health() -> dict:
-        return {"status": "healthy", "service": settings.APP_NAME}
-
-    return application
+    application.include_router(hr_router.router, prefix=f"{prefix}/hr", tags=["HR Dashboard"])
 
 
 app = create_app()

@@ -1,11 +1,11 @@
-"""Pydantic schemas for authentication endpoints."""
+"""Request/response schemas for authentication endpoints."""
 import re
-from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.models.user import UserRole
+from app.schemas.user import UserResponse
 
 _PASSWORD_PATTERN = re.compile(
     r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()\-_=+\[\]{};:,.<>?/\\|`~]).{8,128}$"
@@ -16,7 +16,7 @@ _PASSWORD_RULE = (
 )
 
 
-class UserBase(BaseModel):
+class _UserBase(BaseModel):
     email: EmailStr
     full_name: str = Field(..., min_length=1, max_length=255)
 
@@ -29,7 +29,7 @@ class UserBase(BaseModel):
         return v
 
 
-class UserRegister(UserBase):
+class UserRegister(_UserBase):
     password: str = Field(..., min_length=8, max_length=128)
     role: UserRole = UserRole.CANDIDATE
     hr_invite_code: Optional[str] = Field(default=None, max_length=128)
@@ -45,17 +45,6 @@ class UserRegister(UserBase):
 class UserLogin(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=1, max_length=128)
-
-
-class UserResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    email: EmailStr
-    full_name: str
-    role: UserRole
-    is_active: bool
-    created_at: datetime
 
 
 class TokenResponse(BaseModel):
