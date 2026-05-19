@@ -65,31 +65,6 @@ export function AppLayout() {
             </Button>
           </div>
         </div>
-        <nav className="flex gap-1 overflow-x-auto px-4 py-2 md:hidden">
-          {(isHr ? sideNav.filter((item) => item.enabled) : candidateSideNav).map(({ to, label, icon: Icon }) => {
-            const isActive = (() => {
-              if (to === "/hr") return location.pathname === "/hr";
-              if (to === "/candidate/jobs") {
-                return location.pathname === "/candidate/jobs" && !location.search.includes("searchMode=1");
-              }
-              if (to.includes("?")) return `${location.pathname}${location.search}` === to;
-              return location.pathname.startsWith(to);
-            })();
-            return (
-              <Link
-                key={label}
-                to={to}
-                className={cn(
-                  "inline-flex h-9 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-semibold text-slate-600",
-                  isActive && "bg-blue-700 text-white"
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                {label}
-              </Link>
-            );
-          })}
-        </nav>
       </header>
 
       <aside className="fixed left-0 top-16 z-40 hidden h-[calc(100vh-4rem)] w-64 flex-col border-r border-slate-200 bg-slate-50 p-5 md:flex">
@@ -142,7 +117,7 @@ export function AppLayout() {
           </div>
         </aside>
 
-      <main className="pt-[6.5rem] md:ml-64 md:pt-16">
+      <main className="pt-16 md:ml-64">
         <Outlet />
       </main>
     </div>

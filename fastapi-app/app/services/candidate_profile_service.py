@@ -1,8 +1,12 @@
 """Candidate profile workflows and job recommendations."""
 from typing import List, Optional
 
+from app.core.pagination import Page, PaginationParams
+from app.models.application import ApplicationStatus
 from app.models.candidate_profile import CandidateProfile
+from app.models.job import JobStatus, JobType
 from app.models.user import User
+from app.repositories.application_repository import ApplicationRepository
 from app.repositories.candidate_profile_repository import CandidateProfileRepository
 from app.repositories.job_repository import JobRepository
 from app.schemas.candidate_profile import (
@@ -24,9 +28,11 @@ class CandidateProfileService:
         self,
         profile_repo: CandidateProfileRepository,
         job_repo: JobRepository,
+        application_repo: ApplicationRepository,
     ) -> None:
         self.profile_repo = profile_repo
         self.job_repo = job_repo
+        self.application_repo = application_repo
 
     def get_response(self, candidate: User) -> CandidateProfileResponse:
         """Read-only: return the candidate's profile or a default DTO.
@@ -61,17 +67,86 @@ class CandidateProfileService:
         if profile is None or not self._has_any_signal(profile):
             return []
         jobs = self.job_repo.list_open_jobs(limit=100)
+        application_statuses = self.application_repo.statuses_for_candidate_jobs(
+            candidate_id=candidate.id,
+            job_ids=[job.id for job in jobs],
+        )
         scored = [
             score_job(
                 job,
                 profile=profile,
                 profile_skills=profile.skills,
                 preferred_roles=profile.preferred_roles,
+                application_status=application_statuses.get(job.id),
             )
             for job in jobs
         ]
         scored.sort(key=lambda item: (item.match_score, item.job.created_at), reverse=True)
         return [item for item in scored if item.match_score > 0][:limit]
+
+    def matched_jobs(
+        self,
+        candidate: User,
+        pagination: PaginationParams,
+        *,
+        location: Optional[str] = None,
+        job_type: Optional[JobType] = None,
+        search: Optional[str] = None,
+        skill: Optional[str] = None,
+        salary_min: Optional[int] = None,
+        salary_max: Optional[int] = None,
+    ) -> Page[JobRecommendation]:
+        jobs, total = self.job_repo.list_jobs(
+            limit=pagination.limit,
+            offset=pagination.offset,
+            status=JobStatus.OPEN,
+            location=location,
+            job_type=job_type,
+            search=search,
+            skill=skill,
+            salary_min=salary_min,
+            salary_max=salary_max,
+        )
+        application_statuses = self.application_repo.statuses_for_candidate_jobs(
+            candidate_id=candidate.id,
+            job_ids=[job.id for job in jobs],
+        )
+        profile = self.profile_repo.get_by_candidate_id(candidate.id)
+        items = [
+            self._match_response(
+                job,
+                profile=profile,
+                application_status=application_statuses.get(job.id),
+            )
+            for job in jobs
+        ]
+        return Page[JobRecommendation].build(items=items, total=total, params=pagination)
+
+    def _match_response(
+        self,
+        job,
+        *,
+        profile: CandidateProfile | None,
+        application_status: ApplicationStatus | None,
+    ) -> JobRecommendation:
+        if profile is None or not self._has_any_signal(profile):
+            from app.schemas.job import JobResponse
+
+            return JobRecommendation(
+                job=JobResponse.model_validate(job),
+                match_score=0,
+                matched_skills=[],
+                reason="Complete your profile to improve matching",
+                has_applied=application_status is not None,
+                application_status=application_status,
+            )
+        return score_job(
+            job,
+            profile=profile,
+            profile_skills=profile.skills,
+            preferred_roles=profile.preferred_roles,
+            application_status=application_status,
+        )
 
     @staticmethod
     def _has_any_signal(profile: CandidateProfile) -> bool:

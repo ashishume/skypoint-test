@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, BriefcaseBusiness, IndianRupee, MapPin } from "lucide-react";
+import { ArchiveX, ArrowLeft, BriefcaseBusiness, IndianRupee, MapPin } from "lucide-react";
+import { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { applicationsApi, getApiError, jobsApi } from "@/api/client";
 import type { ApplicationStatus } from "@/api/types";
 import { PageHeader } from "@/components/common/page-header";
 import { JobStatusBadge } from "@/components/common/status-badge";
+import { AlertDialog } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -29,6 +31,7 @@ export default function HrJobDetailsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const jobId = Number(params.jobId);
+  const [isCloseDialogOpen, setIsCloseDialogOpen] = useState(false);
   const validJobId = Number.isInteger(jobId) && jobId > 0 ? jobId : null;
   const applicationStatusFilter = parseApplicationStatus(searchParams.get("applicationStatus"));
   const applicantsPage = parsePositivePage(searchParams.get("page"));
@@ -58,6 +61,18 @@ export default function HrJobDetailsPage() {
       toast.success("Application status updated");
       queryClient.invalidateQueries({ queryKey: ["jobs", validJobId, "applications"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+    onError: (error) => toast.error(getApiError(error)),
+  });
+  const closeMutation = useMutation({
+    mutationFn: () => jobsApi.update(validJobId!, { status: "closed" }),
+    onSuccess: () => {
+      toast.success("Job closed");
+      setIsCloseDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["jobs", validJobId] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["applications"] });
     },
     onError: (error) => toast.error(getApiError(error)),
   });
@@ -111,12 +126,25 @@ export default function HrJobDetailsPage() {
         title={job.title}
         description={`Posted ${formatDate(job.created_at)} • ${job.status === "open" ? "Accepting applications" : "Closed to new applications"}`}
         actions={
-          <Button asChild variant="outline">
-            <Link to="/hr/jobs">
-              <ArrowLeft className="h-4 w-4" />
-              Back to jobs
-            </Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {job.status === "open" ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsCloseDialogOpen(true)}
+                disabled={closeMutation.isPending}
+              >
+                <ArchiveX className="h-4 w-4" />
+                Close job
+              </Button>
+            ) : null}
+            <Button asChild variant="outline">
+              <Link to="/hr/jobs">
+                <ArrowLeft className="h-4 w-4" />
+                Back to jobs
+              </Link>
+            </Button>
+          </div>
         }
       />
       <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
@@ -193,6 +221,14 @@ export default function HrJobDetailsPage() {
           </CardContent>
         </Card>
       </section>
+      <AlertDialog
+        open={isCloseDialogOpen}
+        title={`Close "${job.title}"?`}
+        description="This job will stop accepting applications and will no longer appear in candidate search, recommendations, or active application lists."
+        confirmLabel="Close job"
+        onConfirm={() => closeMutation.mutate()}
+        onCancel={() => setIsCloseDialogOpen(false)}
+      />
     </>
   );
 }

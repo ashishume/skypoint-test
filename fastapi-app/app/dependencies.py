@@ -86,8 +86,9 @@ def get_application_service(
 def get_candidate_profile_service(
     profile_repo: CandidateProfileRepoDep,
     job_repo: JobRepoDep,
+    application_repo: ApplicationRepoDep,
 ) -> CandidateProfileService:
-    return CandidateProfileService(profile_repo, job_repo)
+    return CandidateProfileService(profile_repo, job_repo, application_repo)
 
 
 UserServiceDep = Annotated[UserService, Depends(get_user_service)]

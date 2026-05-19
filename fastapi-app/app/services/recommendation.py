@@ -7,6 +7,7 @@ sum to a 100-point scale.
 import re
 from typing import Iterable, List, Set
 
+from app.models.application import ApplicationStatus
 from app.models.candidate_profile import CandidateProfile
 from app.models.job import JobPosting
 from app.schemas.candidate_profile import JobRecommendation
@@ -87,6 +88,7 @@ def score_job(
     profile: CandidateProfile,
     profile_skills: Iterable[str],
     preferred_roles: Iterable[str],
+    application_status: ApplicationStatus | None = None,
 ) -> JobRecommendation:
     """Score a single job against the candidate's profile."""
     profile_skill_set: Set[str] = {s.lower() for s in profile_skills}
@@ -132,4 +134,6 @@ def score_job(
         match_score=score,
         matched_skills=matched_skills,
         reason=reason,
+        has_applied=application_status is not None,
+        application_status=application_status,
     )

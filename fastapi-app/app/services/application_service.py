@@ -65,12 +65,14 @@ class ApplicationService:
         pagination: PaginationParams,
         *,
         status: Optional[ApplicationStatus] = None,
+        open_jobs_only: bool = False,
     ) -> Page[ApplicationWithJob]:
         items, total = self.application_repo.list_for_candidate(
             candidate_id=candidate.id,
             limit=pagination.limit,
             offset=pagination.offset,
             status=status,
+            open_jobs_only=open_jobs_only,
         )
         return Page[ApplicationWithJob].build(
             items=[ApplicationWithJob.model_validate(a) for a in items],

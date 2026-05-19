@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import joinedload
 
 from app.models.application import Application, ApplicationStatus
+from app.models.job import JobPosting, JobStatus
 from app.repositories.base import BaseRepository
 
 
@@ -22,6 +23,19 @@ class ApplicationRepository(BaseRepository[Application]):
             )
         ).scalar_one_or_none()
 
+    def statuses_for_candidate_jobs(
+        self, *, candidate_id: int, job_ids: List[int]
+    ) -> Dict[int, ApplicationStatus]:
+        if not job_ids:
+            return {}
+        rows = self.db.execute(
+            select(Application.job_id, Application.status).where(
+                Application.candidate_id == candidate_id,
+                Application.job_id.in_(job_ids),
+            )
+        ).all()
+        return {int(job_id): status for job_id, status in rows}
+
     def list_for_candidate(
         self,
         *,
@@ -29,6 +43,7 @@ class ApplicationRepository(BaseRepository[Application]):
         limit: int,
         offset: int,
         status: Optional[ApplicationStatus] = None,
+        open_jobs_only: bool = False,
     ) -> Tuple[List[Application], int]:
         stmt = (
             select(Application)
@@ -36,6 +51,8 @@ class ApplicationRepository(BaseRepository[Application]):
             .where(Application.candidate_id == candidate_id)
             .order_by(Application.created_at.desc(), Application.id.desc())
         )
+        if open_jobs_only:
+            stmt = stmt.join(Application.job).where(JobPosting.status == JobStatus.OPEN)
         if status is not None:
             stmt = stmt.where(Application.status == status)
         return self.paginate(stmt, limit=limit, offset=offset)

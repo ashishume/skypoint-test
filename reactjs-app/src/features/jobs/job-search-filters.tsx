@@ -1,5 +1,4 @@
 import { Search } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -29,7 +28,6 @@ interface JobSearchFiltersProps {
   onKeywordChange: (value: string) => void;
   onLocationChange: (value: string) => void;
   onSalaryRangeChange: (value: string) => void;
-  onSearch: () => void;
 }
 
 export function JobSearchFilters({
@@ -39,11 +37,10 @@ export function JobSearchFilters({
   onKeywordChange,
   onLocationChange,
   onSalaryRangeChange,
-  onSearch,
 }: JobSearchFiltersProps) {
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px_220px_auto] lg:items-end">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px_220px] lg:items-end">
         <label className="space-y-1 text-sm font-semibold text-slate-600">
           <span>Search role</span>
           <div className="relative">
@@ -51,9 +48,6 @@ export function JobSearchFilters({
             <Input
               value={keyword}
               onChange={(event) => onKeywordChange(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") onSearch();
-              }}
               placeholder="Design, engineering, product..."
               className="pl-9"
             />
@@ -64,9 +58,6 @@ export function JobSearchFilters({
           <Input
             value={location}
             onChange={(event) => onLocationChange(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") onSearch();
-            }}
             placeholder="Remote, London..."
           />
         </label>
@@ -85,9 +76,6 @@ export function JobSearchFilters({
             </SelectContent>
           </Select>
         </label>
-        <Button type="button" onClick={onSearch} className="h-10 rounded-md bg-[#091426] px-8 text-white hover:bg-[#172640]">
-          Search Jobs
-        </Button>
       </div>
     </div>
   );

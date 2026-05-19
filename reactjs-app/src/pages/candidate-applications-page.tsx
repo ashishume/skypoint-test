@@ -15,11 +15,12 @@ const APPLICATIONS_PAGE_SIZE = 8;
 export default function CandidateApplicationsPage() {
   const [page, setPage] = useState(1);
   const applicationsQuery = useQuery({
-    queryKey: ["applications", "mine", page],
+    queryKey: ["applications", "mine", "open-jobs", page],
     queryFn: () =>
       applicationsApi.mine({
         limit: APPLICATIONS_PAGE_SIZE,
         offset: (page - 1) * APPLICATIONS_PAGE_SIZE,
+        open_jobs_only: true,
       }),
     placeholderData: (previous) => previous,
   });
@@ -29,7 +30,7 @@ export default function CandidateApplicationsPage() {
       <PageHeader
         eyebrow="Application tracker"
         title="Your applications"
-        description="Follow every application from submission through review."
+        description="Follow applications for roles that are still active."
       />
       <section className="space-y-4 px-4 py-6 sm:px-6 lg:px-8">
         {applicationsQuery.isLoading ? (

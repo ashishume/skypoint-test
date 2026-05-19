@@ -4,6 +4,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator, model_validator
 
+from app.models.application import ApplicationStatus
 from app.schemas.job import JobResponse
 
 
@@ -70,3 +71,5 @@ class JobRecommendation(BaseModel):
     match_score: int
     matched_skills: List[str]
     reason: str
+    has_applied: bool = False
+    application_status: Optional[ApplicationStatus] = None

@@ -4,7 +4,7 @@ import { Send } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { applicationsApi, candidateProfileApi, getApiError, jobsApi } from "@/api/client";
+import { applicationsApi, candidateProfileApi, getApiError } from "@/api/client";
 import type { ApplicationWithJob, Job, JobRecommendation } from "@/api/types";
 import { EmptyState } from "@/components/common/empty-state";
 import { PaginationControls } from "@/components/common/pagination-controls";
@@ -28,6 +28,7 @@ import {
 } from "@/features/jobs/job-search-filters";
 import { ProfileStrengthCard } from "@/features/profile/profile-strength-card";
 import { formatDate, jobTypeLabels } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { useAuth } from "@/app/auth-context";
 
@@ -60,13 +61,16 @@ export default function CandidateJobsPage() {
       location: debouncedLocation,
       salaryRange: debouncedSalaryRange,
     });
+    if (debouncedKeyword || debouncedLocation || debouncedSalaryRange !== "any") {
+      setSearchParams({ searchMode: "1" }, { replace: true });
+    }
   }, [debouncedKeyword, debouncedLocation, debouncedSalaryRange]);
 
   const salary = salaryRangeFilters[filters.salaryRange] ?? salaryRangeFilters.any;
-  const jobsQuery = useQuery({
-    queryKey: ["jobs", "candidate", filters, page],
+  const matchesQuery = useQuery({
+    queryKey: ["candidate", "job-matches", filters, page],
     queryFn: () =>
-      jobsApi.list({
+      candidateProfileApi.jobMatches({
         search: filters.keyword || undefined,
         location: filters.location || undefined,
         salary_min: salary.min,
@@ -87,7 +91,7 @@ export default function CandidateJobsPage() {
   });
   const applicationsQuery = useQuery({
     queryKey: ["applications", "mine", "summary"],
-    queryFn: () => applicationsApi.mine({ limit: 2 }),
+    queryFn: () => applicationsApi.mine({ limit: 2, open_jobs_only: true }),
   });
 
   const recommendations = useMemo(() => {
@@ -108,23 +112,19 @@ export default function CandidateJobsPage() {
   const applyMutation = useMutation({
     mutationFn: (payload: { cover_letter: string; resume_url?: string }) =>
       applicationsApi.apply({ ...payload, job_id: selectedJob!.id }),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Application submitted");
       setSelectedJob(null);
-      queryClient.invalidateQueries({ queryKey: ["applications", "mine"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["applications"], refetchType: "all" }),
+        queryClient.invalidateQueries({ queryKey: ["candidate", "job-matches"], refetchType: "all" }),
+        queryClient.invalidateQueries({ queryKey: ["candidate", "recommendations"], refetchType: "all" }),
+        queryClient.invalidateQueries({ queryKey: ["jobs"], refetchType: "all" }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+      ]);
     },
     onError: (error) => toast.error(getApiError(error)),
   });
-
-  function applyFilters() {
-    setSearchParams({ searchMode: "1" }, { replace: true });
-    setFilters({
-      keyword: draftKeyword.trim(),
-      location: draftLocation.trim(),
-      salaryRange: draftSalaryRange,
-    });
-  }
 
   return (
     <>
@@ -141,16 +141,15 @@ export default function CandidateJobsPage() {
           onKeywordChange={setDraftKeyword}
           onLocationChange={setDraftLocation}
           onSalaryRangeChange={setDraftSalaryRange}
-          onSearch={applyFilters}
         />
 
         {hasActiveSearch ? (
           <SearchResults
-            isLoading={jobsQuery.isLoading}
-            jobs={jobsQuery.data?.items ?? []}
-            total={jobsQuery.data?.total}
-            limit={jobsQuery.data?.limit}
-            offset={jobsQuery.data?.offset}
+            isLoading={matchesQuery.isLoading}
+            matches={matchesQuery.data?.items ?? []}
+            total={matchesQuery.data?.total}
+            limit={matchesQuery.data?.limit}
+            offset={matchesQuery.data?.offset}
             onPageChange={setPage}
             onApply={setSelectedJob}
           />
@@ -183,7 +182,7 @@ export default function CandidateJobsPage() {
 
 function SearchResults({
   isLoading,
-  jobs,
+  matches,
   total,
   limit,
   offset,
@@ -191,7 +190,7 @@ function SearchResults({
   onApply,
 }: {
   isLoading: boolean;
-  jobs: Job[];
+  matches: JobRecommendation[];
   total?: number;
   limit?: number;
   offset?: number;
@@ -212,19 +211,19 @@ function SearchResults({
             <Skeleton key={index} className="h-72 rounded-lg" />
           ))}
         </div>
-      ) : jobs.length ? (
+      ) : matches.length ? (
         <>
           <motion.div layout className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {jobs.map((job) => (
-              <motion.div key={job.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+            {matches.map((match) => (
+              <motion.div key={match.job.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
                 <JobCard
-                  job={job}
-                  href={`/candidate/jobs/${job.id}`}
+                  job={match.job}
+                  href={`/candidate/jobs/${match.job.id}`}
                   actions={
-                    <Button type="button" onClick={() => onApply(job)} className="w-full">
-                      <Send className="h-4 w-4" />
-                      Apply
-                    </Button>
+                    <div className="w-full space-y-3">
+                      <MatchMeta match={match} />
+                      <ApplyJobAction match={match} onApply={onApply} />
+                    </div>
                   }
                 />
               </motion.div>
@@ -312,13 +311,8 @@ function RecommendedJobs({
               href={`/candidate/jobs/${recommendation.job.id}`}
               actions={
                 <div className="w-full space-y-3">
-                  <div className="flex items-center justify-between text-xs font-bold text-blue-700">
-                    <span>{recommendation.match_score}% match</span>
-                    <span>{recommendation.reason}</span>
-                  </div>
-                  <Button type="button" variant="outline" onClick={() => onApply(recommendation.job)} className="w-full">
-                    Quick Apply
-                  </Button>
+                  <MatchMeta match={recommendation} />
+                  <ApplyJobAction match={recommendation} onApply={onApply} />
                 </div>
               }
             />
@@ -330,5 +324,96 @@ function RecommendedJobs({
         </div>
       )}
     </section>
+  );
+}
+
+function MatchMeta({ match }: { match: JobRecommendation }) {
+  const tone = matchScoreTone(match.match_score);
+
+  return (
+    <div className={cn("rounded-lg border px-3 py-2", tone.container)}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className={cn("rounded-full px-2.5 py-1 text-xs font-bold", tone.badge)}>
+          {match.match_score}% match
+        </span>
+        <span className={cn("text-xs font-semibold", tone.text)}>{tone.label}</span>
+      </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/70">
+        <div
+          className={cn("h-full rounded-full transition-all duration-500", tone.bar)}
+          style={{ width: `${Math.max(6, Math.min(match.match_score, 100))}%` }}
+        />
+      </div>
+      <p className="mt-2 line-clamp-2 text-xs font-semibold text-slate-600">{match.reason}</p>
+    </div>
+  );
+}
+
+function matchScoreTone(score: number) {
+  if (score >= 85) {
+    return {
+      label: "Excellent fit",
+      container: "border-emerald-200 bg-emerald-50",
+      badge: "bg-emerald-600 text-white",
+      bar: "bg-emerald-600",
+      text: "text-emerald-800",
+    };
+  }
+  if (score >= 70) {
+    return {
+      label: "Strong fit",
+      container: "border-green-200 bg-green-50",
+      badge: "bg-green-600 text-white",
+      bar: "bg-green-600",
+      text: "text-green-800",
+    };
+  }
+  if (score >= 55) {
+    return {
+      label: "Good fit",
+      container: "border-amber-200 bg-amber-50",
+      badge: "bg-amber-500 text-white",
+      bar: "bg-amber-500",
+      text: "text-amber-800",
+    };
+  }
+  if (score >= 40) {
+    return {
+      label: "Partial fit",
+      container: "border-orange-200 bg-orange-50",
+      badge: "bg-orange-500 text-white",
+      bar: "bg-orange-500",
+      text: "text-orange-800",
+    };
+  }
+  return {
+    label: "Low fit",
+    container: "border-red-200 bg-red-50",
+    badge: "bg-red-600 text-white",
+    bar: "bg-red-600",
+    text: "text-red-800",
+  };
+}
+
+function ApplyJobAction({
+  match,
+  onApply,
+}: {
+  match: JobRecommendation;
+  onApply: (job: Job) => void;
+}) {
+  if (match.has_applied && match.application_status) {
+    return (
+      <Button type="button" variant="outline" className="w-full" disabled>
+        <ApplicationStatusBadge status={match.application_status} />
+      </Button>
+    );
+  }
+
+  return (
+    <Button type="button" variant="outline" onClick={() => onApply(match.job)} className="w-full">
+      <Send className="h-4 w-4" />
+      Quick Apply
+    </Button>
   );
 }

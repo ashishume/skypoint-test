@@ -4,7 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { applicationsApi, getApiError, jobsApi } from "@/api/client";
 import { PageHeader } from "@/components/common/page-header";
-import { JobStatusBadge } from "@/components/common/status-badge";
+import { ApplicationStatusBadge, JobStatusBadge } from "@/components/common/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -31,14 +31,28 @@ export default function CandidateJobDetailsPage() {
     queryFn: () => jobsApi.get(validJobId!),
     enabled: Boolean(validJobId),
   });
+  const applicationsQuery = useQuery({
+    queryKey: ["applications", "mine", "details", validJobId],
+    queryFn: () => applicationsApi.mine({ limit: 100 }),
+    enabled: Boolean(validJobId),
+  });
+
+  const existingApplication = applicationsQuery.data?.items.find(
+    (application) => application.job_id === validJobId
+  );
 
   const applyMutation = useMutation({
     mutationFn: (payload: { cover_letter: string; resume_url?: string }) =>
       applicationsApi.apply({ ...payload, job_id: validJobId! }),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Application submitted");
       setIsApplyOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["applications", "mine"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["applications"], refetchType: "all" }),
+        queryClient.invalidateQueries({ queryKey: ["candidate", "job-matches"], refetchType: "all" }),
+        queryClient.invalidateQueries({ queryKey: ["candidate", "recommendations"], refetchType: "all" }),
+        queryClient.invalidateQueries({ queryKey: ["jobs"], refetchType: "all" }),
+      ]);
     },
     onError: (error) => toast.error(getApiError(error)),
   });
@@ -92,10 +106,16 @@ export default function CandidateJobDetailsPage() {
                 Back to jobs
               </Link>
             </Button>
-            <Button type="button" onClick={() => setIsApplyOpen(true)}>
-              <Send className="h-4 w-4" />
-              Apply
-            </Button>
+            {existingApplication ? (
+              <Button type="button" variant="outline" disabled>
+                <ApplicationStatusBadge status={existingApplication.status} />
+              </Button>
+            ) : (
+              <Button type="button" onClick={() => setIsApplyOpen(true)}>
+                <Send className="h-4 w-4" />
+                Apply
+              </Button>
+            )}
           </div>
         }
       />
@@ -143,7 +163,7 @@ export default function CandidateJobDetailsPage() {
           </CardContent>
         </Card>
       </section>
-      <Dialog open={isApplyOpen} onOpenChange={setIsApplyOpen}>
+      <Dialog open={isApplyOpen && !existingApplication} onOpenChange={setIsApplyOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Apply for {job.title}</DialogTitle>

@@ -148,7 +148,12 @@ export const applicationsApi = {
     const { data } = await api.post<Application>("/applications", payload);
     return data;
   },
-  mine: async (params: { status?: ApplicationStatus; limit?: number; offset?: number } = {}) => {
+  mine: async (params: {
+    status?: ApplicationStatus;
+    limit?: number;
+    offset?: number;
+    open_jobs_only?: boolean;
+  } = {}) => {
     const { data } = await api.get<Page<ApplicationWithJob>>("/applications/my", { params });
     return data;
   },
@@ -176,6 +181,19 @@ export const candidateProfileApi = {
   },
   recommendations: async () => {
     const { data } = await api.get<JobRecommendation[]>("/candidate/recommendations");
+    return data;
+  },
+  jobMatches: async (params: {
+    limit?: number;
+    offset?: number;
+    location?: string;
+    job_type?: JobType;
+    search?: string;
+    skill?: string;
+    salary_min?: number;
+    salary_max?: number;
+  } = {}) => {
+    const { data } = await api.get<Page<JobRecommendation>>("/candidate/job-matches", { params });
     return data;
   },
 };

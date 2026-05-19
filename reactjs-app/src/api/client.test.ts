@@ -113,7 +113,7 @@ describe("api client", () => {
     const patch = vi.spyOn(api, "patch").mockResolvedValue({ data: { id: 1 } });
 
     await applicationsApi.apply({ job_id: 1, cover_letter: "I am a strong fit." });
-    await applicationsApi.mine({ status: "reviewed" });
+    await applicationsApi.mine({ status: "reviewed", open_jobs_only: true });
     await applicationsApi.updateStatus(1, "shortlisted");
     await dashboardApi.hr();
 
@@ -121,7 +121,9 @@ describe("api client", () => {
       job_id: 1,
       cover_letter: "I am a strong fit.",
     });
-    expect(get).toHaveBeenCalledWith("/applications/my", { params: { status: "reviewed" } });
+    expect(get).toHaveBeenCalledWith("/applications/my", {
+      params: { status: "reviewed", open_jobs_only: true },
+    });
     expect(patch).toHaveBeenCalledWith("/applications/1/status", { status: "shortlisted" });
     expect(get).toHaveBeenCalledWith("/hr/dashboard");
   });

@@ -45,8 +45,14 @@ def list_my_applications(
     service: ApplicationServiceDep,
     pagination: Annotated[PaginationParams, Depends()],
     status_filter: Annotated[Optional[ApplicationStatus], Query(alias="status")] = None,
+    open_jobs_only: bool = False,
 ) -> Page[ApplicationWithJob]:
-    return service.list_for_candidate(candidate, pagination, status=status_filter)
+    return service.list_for_candidate(
+        candidate,
+        pagination,
+        status=status_filter,
+        open_jobs_only=open_jobs_only,
+    )
 
 
 @router.patch(

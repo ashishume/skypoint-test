@@ -12,6 +12,7 @@ MY_APPLICATIONS = "/api/v1/applications/my"
 HR_DASHBOARD = "/api/v1/hr/dashboard"
 CANDIDATE_PROFILE = "/api/v1/candidate/profile"
 CANDIDATE_RECOMMENDATIONS = "/api/v1/candidate/recommendations"
+CANDIDATE_JOB_MATCHES = "/api/v1/candidate/job-matches"
 
 
 def auth_header(token: str) -> dict[str, str]:
@@ -272,6 +273,32 @@ class TestApplicationRoutes:
         assert list_response.json()["total"] == 1
         assert list_response.json()["items"][0]["job"]["id"] == job.id
 
+    def test_candidate_can_hide_applications_for_closed_jobs(
+        self,
+        client: TestClient,
+        db: Session,
+        hr_user: User,
+        candidate_user: User,
+        candidate_token: str,
+    ):
+        open_job = create_job(db, hr_user, title="Open Role")
+        closed_job = create_job(db, hr_user, title="Closed Role", status=JobStatus.CLOSED)
+        create_application(db, open_job, candidate_user)
+        create_application(db, closed_job, candidate_user)
+
+        all_response = client.get(MY_APPLICATIONS, headers=auth_header(candidate_token))
+        active_response = client.get(
+            MY_APPLICATIONS,
+            params={"open_jobs_only": True},
+            headers=auth_header(candidate_token),
+        )
+
+        assert all_response.status_code == 200
+        assert all_response.json()["total"] == 2
+        assert active_response.status_code == 200
+        assert active_response.json()["total"] == 1
+        assert active_response.json()["items"][0]["job"]["title"] == "Open Role"
+
     def test_apply_rejects_duplicate_and_closed_jobs(
         self,
         client: TestClient,
@@ -374,9 +401,10 @@ class TestApplicationRoutes:
         client: TestClient,
         db: Session,
         hr_user: User,
+        candidate_user: User,
         candidate_token: str,
     ):
-        create_job(db, hr_user, title="React Product Engineer", location="Remote", skills=["react", "product"])
+        react_job = create_job(db, hr_user, title="React Product Engineer", location="Remote", skills=["react", "product"])
         create_job(db, hr_user, title="Payroll Analyst", location="Remote", skills=["payroll", "excel"])
 
         update_response = client.put(
@@ -396,6 +424,12 @@ class TestApplicationRoutes:
             CANDIDATE_RECOMMENDATIONS,
             headers=auth_header(candidate_token),
         )
+        create_application(db, react_job, candidate_user)
+        matches_response = client.get(
+            CANDIDATE_JOB_MATCHES,
+            params={"search": "react", "limit": 5},
+            headers=auth_header(candidate_token),
+        )
 
         assert update_response.status_code == 200
         assert update_response.json()["skills"] == ["react", "product"]
@@ -407,3 +441,12 @@ class TestApplicationRoutes:
         recommendations = recommendations_response.json()
         assert recommendations[0]["job"]["title"] == "React Product Engineer"
         assert "react" in recommendations[0]["matched_skills"]
+        assert recommendations[0]["match_score"] > 0
+        assert recommendations[0]["has_applied"] is False
+        assert matches_response.status_code == 200
+        matches = matches_response.json()
+        assert matches["total"] == 1
+        assert matches["items"][0]["job"]["title"] == "React Product Engineer"
+        assert matches["items"][0]["match_score"] > 0
+        assert matches["items"][0]["has_applied"] is True
+        assert matches["items"][0]["application_status"] == "pending"

@@ -35,7 +35,7 @@ export function ProfileStrengthCard({ profile }: ProfileStrengthCardProps) {
         <ChecklistItem complete={hasPreferences} label="Add role preferences" />
       </div>
       <Button asChild className="w-full rounded-md bg-white text-[#091426] hover:bg-slate-100">
-        <Link to="/candidate/profile">Complete Profile</Link>
+        <Link to="/candidate/profile">{strength >= 100 ? "Update Profile" : "Complete Profile"}</Link>
       </Button>
     </section>
   );

@@ -138,6 +138,8 @@ export interface JobRecommendation {
   match_score: number;
   matched_skills: string[];
   reason: string;
+  has_applied: boolean;
+  application_status: ApplicationStatus | null;
 }
 
 export interface ApiErrorPayload {

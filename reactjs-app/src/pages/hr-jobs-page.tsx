@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Edit, Eye, FileText, Plus, Search, Trash2, X } from "lucide-react";
+import { ArchiveX, Edit, Eye, FileText, Plus, Search, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -57,6 +57,7 @@ export default function HrJobsPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [applicationsJob, setApplicationsJob] = useState<Job | null>(null);
   const [deletingJob, setDeletingJob] = useState<Job | null>(null);
+  const [closingJob, setClosingJob] = useState<Job | null>(null);
   const [page, setPage] = useState(() => parsePositivePage(searchParams.get("page")));
   const [applicationsPage, setApplicationsPage] = useState(1);
   const queryClient = useQueryClient();
@@ -141,6 +142,16 @@ export default function HrJobsPage() {
     },
     onError: (error) => toast.error(getApiError(error)),
   });
+  const closeMutation = useMutation({
+    mutationFn: (id: number) => jobsApi.update(id, { status: "closed" }),
+    onSuccess: () => {
+      toast.success("Job closed");
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["applications"] });
+    },
+    onError: (error) => toast.error(getApiError(error)),
+  });
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: number; status: ApplicationStatus }) =>
       applicationsApi.updateStatus(id, status),
@@ -154,6 +165,10 @@ export default function HrJobsPage() {
 
   function confirmDelete(job: Job) {
     setDeletingJob(job);
+  }
+
+  function confirmClose(job: Job) {
+    setClosingJob(job);
   }
 
   function updateParams(updates: Record<string, string | null>) {
@@ -286,11 +301,23 @@ export default function HrJobsPage() {
                         <Edit className="h-4 w-4" />
                         Edit
                       </Button>
+                      {job.status === "open" ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => confirmClose(job)}
+                          disabled={closeMutation.isPending}
+                        >
+                          <ArchiveX className="h-4 w-4" />
+                          Close
+                        </Button>
+                      ) : null}
                       <Button
                         type="button"
                         variant="destructive"
                         onClick={() => confirmDelete(job)}
                         disabled={deleteMutation.isPending}
+                        className={job.status === "open" ? "" : "col-span-2"}
                       >
                         <Trash2 className="h-4 w-4" />
                         Delete
@@ -348,6 +375,18 @@ export default function HrJobsPage() {
           ) : null}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={Boolean(closingJob)}
+        title={`Close "${closingJob?.title}"?`}
+        description="This job will stop accepting applications and will no longer appear in candidate search, recommendations, or active application lists."
+        confirmLabel="Close job"
+        onConfirm={() => {
+          if (closingJob) closeMutation.mutate(closingJob.id);
+          setClosingJob(null);
+        }}
+        onCancel={() => setClosingJob(null)}
+      />
 
       <AlertDialog
         open={Boolean(deletingJob)}

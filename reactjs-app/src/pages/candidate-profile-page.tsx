@@ -99,9 +99,13 @@ export default function CandidateProfilePage() {
 
   const updateMutation = useMutation({
     mutationFn: candidateProfileApi.update,
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Profile updated");
-      queryClient.invalidateQueries({ queryKey: ["candidate"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["candidate"], refetchType: "all" }),
+        queryClient.invalidateQueries({ queryKey: ["candidate", "job-matches"], refetchType: "all" }),
+        queryClient.invalidateQueries({ queryKey: ["candidate", "recommendations"], refetchType: "all" }),
+      ]);
     },
     onError: (error) => toast.error(getApiError(error)),
   });
