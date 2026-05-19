@@ -21,11 +21,13 @@ from app.models.user import User, UserRole
 from app.repositories.application_repository import ApplicationRepository
 from app.repositories.candidate_profile_repository import CandidateProfileRepository
 from app.repositories.job_repository import JobRepository
+from app.repositories.message_repository import MessageThreadRepository
 from app.repositories.user_repository import UserRepository
 from app.services.application_service import ApplicationService
 from app.services.auth_service import AuthService
 from app.services.candidate_profile_service import CandidateProfileService
 from app.services.job_service import JobService
+from app.services.message_service import MessageService
 from app.services.user_service import UserService
 
 DbSession = Annotated[Session, Depends(get_db)]
@@ -53,12 +55,17 @@ def get_candidate_profile_repository(db: DbSession) -> CandidateProfileRepositor
     return CandidateProfileRepository(db)
 
 
+def get_message_repository(db: DbSession) -> MessageThreadRepository:
+    return MessageThreadRepository(db)
+
+
 UserRepoDep = Annotated[UserRepository, Depends(get_user_repository)]
 JobRepoDep = Annotated[JobRepository, Depends(get_job_repository)]
 ApplicationRepoDep = Annotated[ApplicationRepository, Depends(get_application_repository)]
 CandidateProfileRepoDep = Annotated[
     CandidateProfileRepository, Depends(get_candidate_profile_repository)
 ]
+MessageRepoDep = Annotated[MessageThreadRepository, Depends(get_message_repository)]
 
 
 def get_user_service(
@@ -92,6 +99,14 @@ def get_candidate_profile_service(
     return CandidateProfileService(profile_repo, job_repo, application_repo)
 
 
+def get_message_service(
+    message_repo: MessageRepoDep,
+    job_repo: JobRepoDep,
+    application_repo: ApplicationRepoDep,
+) -> MessageService:
+    return MessageService(message_repo, job_repo, application_repo)
+
+
 UserServiceDep = Annotated[UserService, Depends(get_user_service)]
 AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
 JobServiceDep = Annotated[JobService, Depends(get_job_service)]
@@ -99,6 +114,7 @@ ApplicationServiceDep = Annotated[ApplicationService, Depends(get_application_se
 CandidateProfileServiceDep = Annotated[
     CandidateProfileService, Depends(get_candidate_profile_service)
 ]
+MessageServiceDep = Annotated[MessageService, Depends(get_message_service)]
 
 
 def get_current_user(

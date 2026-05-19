@@ -22,6 +22,7 @@ from app.routers import auth as auth_router
 from app.routers import candidate_profile as candidate_profile_router
 from app.routers import hr as hr_router
 from app.routers import jobs as jobs_router
+from app.routers import messages as messages_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -107,6 +108,7 @@ def _register_routers(application: FastAPI) -> None:
     application.include_router(
         candidate_profile_router.router, prefix=f"{prefix}/candidate", tags=["Candidate Profile"]
     )
+    application.include_router(messages_router.router, prefix=f"{prefix}/messages", tags=["Messages"])
     application.include_router(hr_router.router, prefix=f"{prefix}/hr", tags=["HR Dashboard"])
 
 

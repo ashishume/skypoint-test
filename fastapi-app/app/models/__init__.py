@@ -3,6 +3,7 @@ from app.models.user import User, UserRole
 from app.models.candidate_profile import CandidateProfile
 from app.models.job import JobPosting, JobStatus, JobType
 from app.models.application import Application, ApplicationStatus
+from app.models.message import Message, MessageThread
 
 __all__ = [
     "Base",
@@ -14,4 +15,6 @@ __all__ = [
     "JobType",
     "Application",
     "ApplicationStatus",
+    "Message",
+    "MessageThread",
 ]

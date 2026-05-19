@@ -1,5 +1,5 @@
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { ClipboardList, LayoutDashboard, LogOut, Search, UserRound, UsersRound } from "lucide-react";
+import { ClipboardList, LayoutDashboard, LogOut, Mail, Search, UserRound, UsersRound } from "lucide-react";
 import { useAuth } from "@/app/auth-context";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ const candidateSideNav = [
   { to: "/candidate/jobs", label: "Dashboard", icon: LayoutDashboard },
   { to: "/candidate/jobs?searchMode=1", label: "Active Searches", icon: Search },
   { to: "/candidate/applications", label: "Applications", icon: ClipboardList },
+  { to: "/candidate/messages", label: "Messages", icon: Mail },
   { to: "/candidate/profile", label: "Profile", icon: UserRound },
 ];
 

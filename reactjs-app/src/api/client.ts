@@ -13,6 +13,7 @@ import type {
   JobPayload,
   JobStatus,
   JobType,
+  MessageThread,
   Page,
   TokenResponse,
   User,
@@ -204,6 +205,21 @@ export const candidateProfileApi = {
     salary_max?: number;
   } = {}) => {
     const { data } = await api.get<Page<JobRecommendation>>("/candidate/job-matches", { params });
+    return data;
+  },
+};
+
+export const messagesApi = {
+  sendToCandidate: async (payload: { candidate_id: number; job_id: number; body: string }) => {
+    const { data } = await api.post<MessageThread>("/messages/hr", payload);
+    return data;
+  },
+  candidateThreads: async () => {
+    const { data } = await api.get<MessageThread[]>("/messages/candidate");
+    return data;
+  },
+  reply: async (threadId: number, payload: { body: string }) => {
+    const { data } = await api.post<MessageThread>(`/messages/candidate/${threadId}/reply`, payload);
     return data;
   },
 };

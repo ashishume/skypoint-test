@@ -9,6 +9,7 @@ const AuthPage = lazy(() => import("@/pages/auth-page"));
 const CandidateJobsPage = lazy(() => import("@/pages/candidate-jobs-page"));
 const CandidateJobDetailsPage = lazy(() => import("@/pages/candidate-job-details-page"));
 const CandidateApplicationsPage = lazy(() => import("@/pages/candidate-applications-page"));
+const CandidateMessagesPage = lazy(() => import("@/pages/candidate-messages-page"));
 const CandidateProfilePage = lazy(() => import("@/pages/candidate-profile-page"));
 const HrDashboardPage = lazy(() => import("@/pages/hr-dashboard-page"));
 const HrCandidatesPage = lazy(() => import("@/pages/hr-candidates-page"));
@@ -56,6 +57,7 @@ export function AppRouter() {
             <Route path="/candidate/jobs" element={<CandidateJobsPage />} />
             <Route path="/candidate/jobs/:jobId" element={<CandidateJobDetailsPage />} />
             <Route path="/candidate/applications" element={<CandidateApplicationsPage />} />
+            <Route path="/candidate/messages" element={<CandidateMessagesPage />} />
             <Route path="/candidate/profile" element={<CandidateProfilePage />} />
           </Route>
         </Route>

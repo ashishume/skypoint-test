@@ -149,6 +149,25 @@ export interface JobRecommendation {
   application_status: ApplicationStatus | null;
 }
 
+export interface Message {
+  id: number;
+  thread_id: number;
+  sender_id: number;
+  sender: PublicUser;
+  body: string;
+  created_at: string;
+}
+
+export interface MessageThread {
+  id: number;
+  job: Job;
+  candidate: PublicUser;
+  hr: PublicUser;
+  messages: Message[];
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ApiErrorPayload {
   detail?: string | Array<{ msg: string; loc?: Array<string | number> }>;
   message?: string;
