@@ -1,4 +1,5 @@
 """Data-access for Application aggregate."""
+from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy import func, select
@@ -78,6 +79,14 @@ class ApplicationRepository(BaseRepository[Application]):
             .options(joinedload(Application.job), joinedload(Application.candidate))
             .order_by(Application.created_at.desc(), Application.id.desc())
             .limit(limit)
+        )
+        return list(self.db.execute(stmt).scalars().all())
+
+    def created_at_since(self, since: datetime) -> List[datetime]:
+        stmt = (
+            select(Application.created_at)
+            .where(Application.created_at >= since)
+            .order_by(Application.created_at.asc(), Application.id.asc())
         )
         return list(self.db.execute(stmt).scalars().all())
 

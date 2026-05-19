@@ -44,6 +44,8 @@ class JobService:
         location: Optional[str] = None,
         job_type: Optional[JobType] = None,
         search: Optional[str] = None,
+        salary_min: Optional[int] = None,
+        salary_max: Optional[int] = None,
     ) -> Page[JobResponse]:
         items, total = self.job_repo.list_jobs(
             limit=pagination.limit,
@@ -52,6 +54,8 @@ class JobService:
             location=location,
             job_type=job_type,
             search=search,
+            salary_min=salary_min,
+            salary_max=salary_max,
         )
         return Page[JobResponse].build(
             items=[JobResponse.model_validate(j) for j in items],

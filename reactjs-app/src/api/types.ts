@@ -58,6 +58,23 @@ export interface JobPayload {
   status?: JobStatus;
 }
 
+export interface CandidateProfile {
+  id: number;
+  candidate_id: number;
+  resume_url: string | null;
+  skills: string[];
+  work_experience: string;
+  profile_strength: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CandidateProfilePayload {
+  resume_url?: string | null;
+  skills: string[];
+  work_experience: string;
+}
+
 export interface Application {
   id: number;
   job_id: number;
@@ -77,12 +94,39 @@ export interface ApplicationWithCandidate extends Application {
   candidate: PublicUser;
 }
 
+export interface ApplicationWithJobAndCandidate extends ApplicationWithJob {
+  candidate: PublicUser;
+}
+
+export interface HiringVelocityBucket {
+  label: string;
+  start_date: string;
+  end_date: string;
+  applications: number;
+}
+
+export interface HiringVelocity {
+  window_days: number;
+  total_applications: number;
+  average_weekly_applications: number;
+  peak_week_label: string;
+  buckets: HiringVelocityBucket[];
+}
+
 export interface DashboardStats {
   total_jobs: number;
   jobs_by_status: Record<JobStatus, number>;
   total_applications: number;
   applications_by_status: Record<ApplicationStatus, number>;
-  recent_applications: ApplicationWithJob[];
+  recent_applications: ApplicationWithJobAndCandidate[];
+  hiring_velocity: HiringVelocity;
+}
+
+export interface JobRecommendation {
+  job: Job;
+  match_score: number;
+  matched_skills: string[];
+  reason: string;
 }
 
 export interface ApiErrorPayload {

@@ -48,6 +48,8 @@ def list_jobs(
     location: Annotated[Optional[str], Query(max_length=255)] = None,
     job_type: Optional[JobType] = None,
     search: Annotated[Optional[str], Query(max_length=255)] = None,
+    salary_min: Annotated[Optional[int], Query(ge=0, le=10_000_000)] = None,
+    salary_max: Annotated[Optional[int], Query(ge=0, le=10_000_000)] = None,
 ) -> Page[JobResponse]:
     effective_status = status_filter
     if current_user.role == UserRole.CANDIDATE:
@@ -59,6 +61,8 @@ def list_jobs(
         location=location,
         job_type=job_type,
         search=search,
+        salary_min=salary_min,
+        salary_max=salary_max,
     )
 
 

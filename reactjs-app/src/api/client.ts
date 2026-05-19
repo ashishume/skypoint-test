@@ -7,6 +7,9 @@ import type {
   ApplicationWithJob,
   DashboardStats,
   Job,
+  CandidateProfile,
+  CandidateProfilePayload,
+  JobRecommendation,
   JobPayload,
   JobStatus,
   JobType,
@@ -106,8 +109,14 @@ export const jobsApi = {
     location?: string;
     job_type?: JobType;
     search?: string;
+    salary_min?: number;
+    salary_max?: number;
   } = {}) => {
     const { data } = await api.get<Page<Job>>("/jobs", { params });
+    return data;
+  },
+  get: async (id: number) => {
+    const { data } = await api.get<Job>(`/jobs/${id}`);
     return data;
   },
   create: async (payload: JobPayload) => {
@@ -121,7 +130,10 @@ export const jobsApi = {
   remove: async (id: number) => {
     await api.delete(`/jobs/${id}`);
   },
-  applications: async (jobId: number, params: { status?: ApplicationStatus } = {}) => {
+  applications: async (
+    jobId: number,
+    params: { status?: ApplicationStatus; limit?: number; offset?: number } = {}
+  ) => {
     const { data } = await api.get<Page<ApplicationWithCandidate>>(
       `/jobs/${jobId}/applications`,
       { params }
@@ -135,7 +147,7 @@ export const applicationsApi = {
     const { data } = await api.post<Application>("/applications", payload);
     return data;
   },
-  mine: async (params: { status?: ApplicationStatus } = {}) => {
+  mine: async (params: { status?: ApplicationStatus; limit?: number; offset?: number } = {}) => {
     const { data } = await api.get<Page<ApplicationWithJob>>("/applications/my", { params });
     return data;
   },
@@ -148,6 +160,21 @@ export const applicationsApi = {
 export const dashboardApi = {
   hr: async () => {
     const { data } = await api.get<DashboardStats>("/hr/dashboard");
+    return data;
+  },
+};
+
+export const candidateProfileApi = {
+  get: async () => {
+    const { data } = await api.get<CandidateProfile>("/candidate/profile");
+    return data;
+  },
+  update: async (payload: CandidateProfilePayload) => {
+    const { data } = await api.put<CandidateProfile>("/candidate/profile", payload);
+    return data;
+  },
+  recommendations: async () => {
+    const { data } = await api.get<JobRecommendation[]>("/candidate/recommendations");
     return data;
   },
 };

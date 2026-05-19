@@ -1,129 +1,85 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { BriefcaseBusiness, ClipboardCheck, Clock, UsersRound } from "lucide-react";
-import { dashboardApi } from "@/api/client";
-import { ApplicationStatusBadge } from "@/components/common/status-badge";
-import { MetricCard } from "@/components/common/metric-card";
-import { PageHeader } from "@/components/common/page-header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { dashboardApi, jobsApi } from "@/api/client";
+import type { ApplicationStatus } from "@/api/types";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { applicationStatusLabels, compactNumber, formatDate } from "@/lib/format";
+import { ActivityFeedPanel } from "@/features/dashboard/activity-feed-panel";
+import { CandidatePipelinePanel } from "@/features/dashboard/candidate-pipeline-panel";
+import { DashboardHeader } from "@/features/dashboard/dashboard-header";
+import { HiringVelocityPanel } from "@/features/dashboard/hiring-velocity-panel";
+import { MetricGrid } from "@/features/dashboard/metric-grid";
+import { RecentJobsPanel } from "@/features/dashboard/recent-jobs-panel";
+import { TalentPoolCard } from "@/features/dashboard/talent-pool-card";
+
+const statusColumns: Array<{
+  key: string;
+  label: string;
+  statuses: ApplicationStatus[];
+}> = [
+  { key: "applied", label: "Applied", statuses: ["pending"] },
+  { key: "interview", label: "Interview", statuses: ["reviewed"] },
+  { key: "offer", label: "Offer", statuses: ["shortlisted"] },
+];
 
 export default function HrDashboardPage() {
   const dashboardQuery = useQuery({
     queryKey: ["dashboard", "hr"],
     queryFn: dashboardApi.hr,
   });
+  const jobsQuery = useQuery({
+    queryKey: ["jobs", "hr", "dashboard-recent"],
+    queryFn: () => jobsApi.list({ limit: 5 }),
+  });
   const stats = dashboardQuery.data;
+  const recentApplications = stats?.recent_applications ?? [];
+  const recentJobs = jobsQuery.data?.items ?? [];
+
+  const groupedApplications = useMemo(() => {
+    return statusColumns.map((column) => ({
+      ...column,
+      applications: recentApplications.filter((application) => column.statuses.includes(application.status)),
+      count: column.statuses.reduce((sum, status) => sum + (stats?.applications_by_status[status] ?? 0), 0),
+    }));
+  }, [recentApplications, stats]);
+
+  if (dashboardQuery.isLoading) {
+    return (
+      <section className="space-y-6 px-4 py-7 sm:px-6 lg:px-8">
+        <Skeleton className="h-24 rounded-lg" />
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <Skeleton key={index} className="h-36 rounded-lg" />
+          ))}
+        </div>
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(340px,1fr)]">
+          <Skeleton className="h-96 rounded-lg" />
+          <Skeleton className="h-96 rounded-lg" />
+        </div>
+      </section>
+    );
+  }
+
+  if (!stats) return null;
+
+  const totalTalentPool = Math.max(stats.total_applications, recentApplications.length);
 
   return (
-    <>
-      <PageHeader
-        eyebrow="HR workspace"
-        title="Hiring command center"
-        description="Track role coverage, applicant volume, and recent candidate movement from one place."
-      />
-      <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-        {dashboardQuery.isLoading ? (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <Skeleton key={index} className="h-36 rounded-lg" />
-            ))}
-          </div>
-        ) : stats ? (
-          <>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <MetricCard
-                icon={BriefcaseBusiness}
-                title="Total jobs"
-                value={compactNumber(stats.total_jobs)}
-                detail={`${stats.jobs_by_status.open} open roles`}
-              />
-              <MetricCard
-                icon={ClipboardCheck}
-                title="Applications"
-                value={compactNumber(stats.total_applications)}
-                detail={`${stats.applications_by_status.shortlisted} shortlisted`}
-              />
-              <MetricCard
-                icon={Clock}
-                title="Pending review"
-                value={stats.applications_by_status.pending}
-                detail="Needs HR attention"
-              />
-              <MetricCard
-                icon={UsersRound}
-                title="Reviewed"
-                value={stats.applications_by_status.reviewed}
-                detail="Moved past first pass"
-              />
-            </div>
+    <section className="space-y-6 px-4 py-7 sm:px-6 lg:px-8">
+      <DashboardHeader />
+      <MetricGrid stats={stats} />
 
-            <div className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
-              <Card className="rounded-lg">
-                <CardHeader>
-                  <CardTitle>Status mix</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {Object.entries(stats.applications_by_status).map(([status, count]) => (
-                    <div key={status} className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span>{applicationStatusLabels[status as keyof typeof applicationStatusLabels]}</span>
-                        <span className="font-semibold">{count}</span>
-                      </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-muted">
-                        <div
-                          className="h-full rounded-full bg-primary transition-all"
-                          style={{
-                            width: `${stats.total_applications ? (count / stats.total_applications) * 100 : 0}%`,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(340px,1fr)]">
+        <div className="space-y-4">
+          <CandidatePipelinePanel columns={groupedApplications} />
+          <RecentJobsPanel jobs={recentJobs} />
+        </div>
 
-              <Card className="rounded-lg">
-                <CardHeader>
-                  <CardTitle>Recent applications</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Role</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Applied</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {stats.recent_applications.map((application) => (
-                        <TableRow key={application.id}>
-                          <TableCell className="font-medium">{application.job.title}</TableCell>
-                          <TableCell>
-                            <ApplicationStatusBadge status={application.status} />
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {formatDate(application.created_at)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                      {!stats.recent_applications.length ? (
-                        <TableRow>
-                          <TableCell colSpan={3} className="text-center text-muted-foreground">
-                            No recent applications.
-                          </TableCell>
-                        </TableRow>
-                      ) : null}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </div>
-          </>
-        ) : null}
-      </section>
-    </>
+        <div className="space-y-4">
+          <ActivityFeedPanel applications={recentApplications} />
+          <TalentPoolCard totalTalentPool={totalTalentPool} />
+          <HiringVelocityPanel velocity={stats.hiring_velocity} />
+        </div>
+      </div>
+    </section>
   );
 }

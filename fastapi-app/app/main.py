@@ -19,6 +19,7 @@ from app.core.middleware import (
 from app.database import engine
 from app.routers import applications as applications_router
 from app.routers import auth as auth_router
+from app.routers import candidate_profile as candidate_profile_router
 from app.routers import hr as hr_router
 from app.routers import jobs as jobs_router
 
@@ -102,6 +103,9 @@ def _register_routers(application: FastAPI) -> None:
     application.include_router(jobs_router.router, prefix=f"{prefix}/jobs", tags=["Jobs"])
     application.include_router(
         applications_router.router, prefix=f"{prefix}/applications", tags=["Applications"]
+    )
+    application.include_router(
+        candidate_profile_router.router, prefix=f"{prefix}/candidate", tags=["Candidate Profile"]
     )
     application.include_router(hr_router.router, prefix=f"{prefix}/hr", tags=["HR Dashboard"])
 

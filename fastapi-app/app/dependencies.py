@@ -19,10 +19,12 @@ from app.core.security import decode_access_token
 from app.database import get_db
 from app.models.user import User, UserRole
 from app.repositories.application_repository import ApplicationRepository
+from app.repositories.candidate_profile_repository import CandidateProfileRepository
 from app.repositories.job_repository import JobRepository
 from app.repositories.user_repository import UserRepository
 from app.services.application_service import ApplicationService
 from app.services.auth_service import AuthService
+from app.services.candidate_profile_service import CandidateProfileService
 from app.services.job_service import JobService
 from app.services.user_service import UserService
 
@@ -47,9 +49,16 @@ def get_application_repository(db: DbSession) -> ApplicationRepository:
     return ApplicationRepository(db)
 
 
+def get_candidate_profile_repository(db: DbSession) -> CandidateProfileRepository:
+    return CandidateProfileRepository(db)
+
+
 UserRepoDep = Annotated[UserRepository, Depends(get_user_repository)]
 JobRepoDep = Annotated[JobRepository, Depends(get_job_repository)]
 ApplicationRepoDep = Annotated[ApplicationRepository, Depends(get_application_repository)]
+CandidateProfileRepoDep = Annotated[
+    CandidateProfileRepository, Depends(get_candidate_profile_repository)
+]
 
 
 def get_user_service(repo: UserRepoDep) -> UserService:
@@ -71,10 +80,20 @@ def get_application_service(
     return ApplicationService(application_repo, job_repo)
 
 
+def get_candidate_profile_service(
+    profile_repo: CandidateProfileRepoDep,
+    job_repo: JobRepoDep,
+) -> CandidateProfileService:
+    return CandidateProfileService(profile_repo, job_repo)
+
+
 UserServiceDep = Annotated[UserService, Depends(get_user_service)]
 AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
 JobServiceDep = Annotated[JobService, Depends(get_job_service)]
 ApplicationServiceDep = Annotated[ApplicationService, Depends(get_application_service)]
+CandidateProfileServiceDep = Annotated[
+    CandidateProfileService, Depends(get_candidate_profile_service)
+]
 
 
 def get_current_user(

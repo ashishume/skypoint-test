@@ -9,6 +9,7 @@ from app.models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.application import Application
+    from app.models.candidate_profile import CandidateProfile
     from app.models.job import JobPosting
 
 
@@ -44,6 +45,12 @@ class User(Base, TimestampMixin):
         "Application",
         back_populates="candidate",
         cascade="all, delete-orphan",
+    )
+    candidate_profile: Mapped["CandidateProfile | None"] = relationship(
+        "CandidateProfile",
+        back_populates="candidate",
+        cascade="all, delete-orphan",
+        uselist=False,
     )
 
     __table_args__ = (

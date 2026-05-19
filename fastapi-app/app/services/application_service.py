@@ -1,4 +1,5 @@
 """Application business logic: apply, list, status updates, HR dashboard."""
+from datetime import datetime, time, timedelta, timezone
 from typing import Optional
 
 from app.core.exceptions import BadRequestError, ConflictError
@@ -12,10 +13,13 @@ from app.schemas.application import (
     ApplicationCreate,
     ApplicationResponse,
     ApplicationWithCandidate,
+    ApplicationWithJobAndCandidate,
     ApplicationWithJob,
 )
 from app.schemas.dashboard import (
     ApplicationStatusCounts,
+    HiringVelocity,
+    HiringVelocityBucket,
     HrDashboardResponse,
     JobStatusCounts,
 )
@@ -109,6 +113,7 @@ class ApplicationService:
         app_counts = self.application_repo.status_counts()
         total_jobs = sum(job_counts.values())
         total_apps = sum(app_counts.values())
+        hiring_velocity = self._hiring_velocity()
 
         return HrDashboardResponse(
             total_jobs=total_jobs,
@@ -124,7 +129,48 @@ class ApplicationService:
                 rejected=app_counts.get(ApplicationStatus.REJECTED, 0),
             ),
             recent_applications=[
-                ApplicationWithJob.model_validate(a)
+                ApplicationWithJobAndCandidate.model_validate(a)
                 for a in self.application_repo.recent(limit=10)
             ],
+            hiring_velocity=hiring_velocity,
+        )
+
+    def _hiring_velocity(self) -> HiringVelocity:
+        window_days = 30
+        today = datetime.now(timezone.utc).date()
+        start_date = today - timedelta(days=window_days - 1)
+        since = datetime.combine(start_date, time.min, tzinfo=timezone.utc)
+        created_dates = [
+            created_at.date()
+            for created_at in self.application_repo.created_at_since(since)
+        ]
+
+        bucket_spans = [9, 7, 7, 7]
+        buckets: list[HiringVelocityBucket] = []
+        cursor = start_date
+        for index, span in enumerate(bucket_spans, start=1):
+            bucket_start = cursor
+            bucket_end = min(today, cursor + timedelta(days=span - 1))
+            applications = sum(
+                1 for created_date in created_dates
+                if bucket_start <= created_date <= bucket_end
+            )
+            buckets.append(
+                HiringVelocityBucket(
+                    label=f"Week {index}",
+                    start_date=bucket_start,
+                    end_date=bucket_end,
+                    applications=applications,
+                )
+            )
+            cursor = bucket_end + timedelta(days=1)
+
+        total = sum(bucket.applications for bucket in buckets)
+        peak_bucket = max(buckets, key=lambda bucket: bucket.applications)
+        return HiringVelocity(
+            window_days=window_days,
+            total_applications=total,
+            average_weekly_applications=round(total / len(buckets), 1),
+            peak_week_label=peak_bucket.label,
+            buckets=buckets,
         )

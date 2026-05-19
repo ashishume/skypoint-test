@@ -1,31 +1,50 @@
-import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
-import { BriefcaseBusiness, ClipboardList, LayoutDashboard, LogOut, UserRound } from "lucide-react";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import {
+  BriefcaseBusiness,
+  ClipboardList,
+  LayoutDashboard,
+  LogOut,
+  Search,
+  UserRound,
+} from "lucide-react";
 import { useAuth } from "@/app/auth-context";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
-const navByRole = {
-  hr: [
-    { to: "/hr", label: "Dashboard", icon: LayoutDashboard },
-    { to: "/hr/jobs", label: "Jobs", icon: BriefcaseBusiness },
-  ],
-  candidate: [
-    { to: "/candidate/jobs", label: "Jobs", icon: BriefcaseBusiness },
-    { to: "/candidate/applications", label: "Applications", icon: ClipboardList },
-  ],
-};
+const topNav = [
+  { to: "/hr/jobs", label: "Jobs", enabled: true },
+];
+
+const sideNav = [
+  { to: "/hr", label: "Dashboard", icon: LayoutDashboard, enabled: true },
+  { to: "/hr/jobs", label: "Active Searches", icon: Search, enabled: true },
+];
+
+const candidateNav = [
+  { to: "/candidate/jobs", label: "Jobs", icon: BriefcaseBusiness },
+  { to: "/candidate/applications", label: "Applications", icon: ClipboardList },
+  { to: "/candidate/profile", label: "Profile", icon: UserRound },
+];
+
+const candidateSideNav = [
+  { to: "/candidate/jobs", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/candidate/applications", label: "Applications", icon: ClipboardList },
+  { to: "/candidate/profile", label: "Profile", icon: UserRound },
+];
 
 export function AppLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const initials = user?.full_name
     .split(" ")
     .map((part) => part[0])
     .join("")
     .slice(0, 2)
     .toUpperCase();
+  const isHr = user?.role === "hr";
 
   function handleLogout() {
     logout();
@@ -33,71 +52,139 @@ export function AppLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-950">
-      <header className="sticky top-0 z-40 border-b bg-white/90 backdrop-blur">
+    <div className="min-h-screen bg-[#f7f9fb] text-[#091426]">
+      <header className="fixed inset-x-0 top-0 z-50 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur">
         <div className="flex h-16 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-          <Link to="/" className="flex items-center gap-2 font-semibold">
-            <span className="grid h-9 w-9 place-items-center rounded-md bg-primary text-primary-foreground">
-              <BriefcaseBusiness className="h-5 w-5" />
-            </span>
-            <span>RecruitFlow</span>
-          </Link>
-          <nav className="hidden items-center gap-1 md:flex">
-            {user
-              ? navByRole[user.role].map(({ to, label, icon: Icon }) => (
-                  <NavLink
-                    key={to}
-                    to={to}
-                    end
-                    className={({ isActive }) =>
-                      cn(
-                        "inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-                        isActive && "bg-primary/10 text-primary"
-                      )
-                    }
-                  >
-                    <Icon className="h-4 w-4" />
-                    {label}
-                  </NavLink>
-                ))
-              : null}
-          </nav>
-          <div className="flex items-center gap-3">
-            <div className="hidden text-right sm:block">
-              <p className="text-sm font-medium">{user?.full_name}</p>
-              <p className="text-xs capitalize text-muted-foreground">{user?.role}</p>
-            </div>
-            <Avatar>
-              <AvatarFallback className="bg-primary/10 text-primary">{initials || <UserRound />}</AvatarFallback>
-            </Avatar>
+          <div className="flex min-w-0 items-center gap-8">
+            <Link to={isHr ? "/hr" : "/candidate/jobs"} className="shrink-0 text-2xl font-bold tracking-tight">
+              TalentFlow
+            </Link>
+            <nav className="hidden items-center gap-7 md:flex">
+              {isHr
+                ? topNav.map((item) =>
+                    item.enabled ? (
+                      <Link
+                        key={item.label}
+                        to={item.to}
+                        className={cn(
+                          "border-b-2 border-transparent py-5 text-sm font-semibold text-slate-600 transition-colors hover:text-blue-700",
+                          (location.pathname === "/hr" || location.pathname.startsWith(item.to)) &&
+                            "border-blue-700 text-blue-700"
+                        )}
+                      >
+                        {item.label}
+                      </Link>
+                    ) : (
+                      <span
+                        key={item.label}
+                        className="cursor-not-allowed py-5 text-sm font-semibold text-slate-500"
+                        title="Planned feature"
+                      >
+                        {item.label}
+                      </span>
+                    )
+                  )
+                : candidateNav.map(({ to, label }) => (
+                    <NavLink
+                      key={to}
+                      to={to}
+                      className={({ isActive }) =>
+                        cn(
+                          "border-b-2 border-transparent py-5 text-sm font-semibold text-slate-600 transition-colors hover:text-blue-700",
+                          isActive && "border-blue-700 text-blue-700"
+                        )
+                      }
+                    >
+                      {label}
+                    </NavLink>
+                  ))}
+            </nav>
+          </div>
+
+          <div className="flex items-center gap-2 sm:gap-4">
+            {isHr ? (
+              <>
+                <Button asChild className="hidden rounded-md bg-[#091426] px-5 text-white hover:bg-[#172640] sm:inline-flex">
+                  <Link to="/hr/jobs?create=1">Post a Job</Link>
+                </Button>
+              </>
+            ) : null}
+            <Link to={isHr ? "/hr" : "/candidate/profile"} aria-label="Open profile">
+              <Avatar className="h-9 w-9 border border-slate-200 bg-[#173447] shadow-sm">
+                <AvatarFallback className="bg-[#173447] text-xs font-bold text-white">
+                  {initials || <UserRound className="h-4 w-4" />}
+                </AvatarFallback>
+              </Avatar>
+            </Link>
             <Button type="button" variant="ghost" size="icon" onClick={handleLogout} aria-label="Sign out">
-              <LogOut className="h-4 w-4" />
+              <LogOut className="h-4 w-4 text-slate-600" />
             </Button>
           </div>
         </div>
-        <Separator />
         <nav className="flex gap-1 overflow-x-auto px-4 py-2 md:hidden">
-          {user
-            ? navByRole[user.role].map(({ to, label, icon: Icon }) => (
-                <NavLink
-                  key={to}
-                  to={to}
-                  end
-                  className={({ isActive }) =>
-                    cn(
-                      "inline-flex h-9 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-medium text-muted-foreground",
-                      isActive && "bg-primary/10 text-primary"
-                    )
-                  }
-                >
-                  <Icon className="h-4 w-4" />
-                  {label}
-                </NavLink>
-              ))
-            : null}
+          {(isHr ? sideNav.filter((item) => item.enabled) : candidateSideNav).map(({ to, label, icon: Icon }) => (
+            <NavLink
+              key={label}
+              to={to}
+              end={to === "/hr"}
+              className={({ isActive }) =>
+                cn(
+                  "inline-flex h-9 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-semibold text-slate-600",
+                  isActive && "bg-blue-700 text-white"
+                )
+              }
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </NavLink>
+          ))}
         </nav>
       </header>
-      <main>
+
+      <aside className="fixed left-0 top-16 z-40 hidden h-[calc(100vh-4rem)] w-64 flex-col border-r border-slate-200 bg-slate-50 p-5 md:flex">
+          <div className="mb-9">
+            <h2 className="text-xl font-bold tracking-tight">{isHr ? "Recruiter Portal" : "Candidate Portal"}</h2>
+            <p className="text-sm font-semibold text-slate-600">{isHr ? "Enterprise Tier" : "Job Seeker"}</p>
+          </div>
+          <nav className="flex-1 space-y-3">
+            {(isHr ? sideNav : candidateSideNav).map(({ to, label, icon: Icon }) => {
+              const isActive = to === "/hr" ? location.pathname === "/hr" : location.pathname.startsWith(to);
+              const content = (
+                <>
+                  <Icon className="h-5 w-5" />
+                  <span>{label}</span>
+                </>
+              );
+
+              return (
+                <NavLink
+                  key={label}
+                  to={to}
+                  end={to === "/hr"}
+                  className={cn(
+                    "flex items-center gap-4 rounded-lg px-4 py-3 text-sm font-bold text-slate-600 transition-all hover:bg-white hover:text-blue-700 hover:shadow-sm active:scale-[0.99]",
+                    isActive && "bg-blue-700 text-white shadow-md hover:bg-blue-700 hover:text-white"
+                  )}
+                >
+                  {content}
+                </NavLink>
+              );
+            })}
+          </nav>
+          <Separator className="mb-4 bg-slate-200" />
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="flex w-full items-center gap-3 rounded-md px-4 py-2 text-left text-sm font-semibold text-slate-500 transition-colors hover:bg-white hover:text-slate-900"
+            >
+              <LogOut className="h-4 w-4" />
+              Sign Out
+            </button>
+          </div>
+        </aside>
+
+      <main className="pt-[6.5rem] md:ml-64 md:pt-16">
         <Outlet />
       </main>
     </div>

@@ -10,6 +10,8 @@ JOBS = "/api/v1/jobs"
 APPLICATIONS = "/api/v1/applications"
 MY_APPLICATIONS = "/api/v1/applications/my"
 HR_DASHBOARD = "/api/v1/hr/dashboard"
+CANDIDATE_PROFILE = "/api/v1/candidate/profile"
+CANDIDATE_RECOMMENDATIONS = "/api/v1/candidate/recommendations"
 
 
 def auth_header(token: str) -> dict[str, str]:
@@ -126,9 +128,18 @@ class TestJobRoutes:
         create_job(db, hr_user, title="Backend Engineer", location="Remote")
         create_job(db, hr_user, title="Design Lead", location="Bangalore", job_type=JobType.CONTRACT)
 
+        description_match = create_job(db, hr_user, title="Frontend Developer", location="Pune")
+        description_match.description = "Build reliable backend APIs for candidates."
+        db.commit()
+
         response = client.get(
             JOBS,
             params={"search": "Backend", "location": "remote", "job_type": "full_time"},
+            headers=auth_header(hr_token),
+        )
+        broad_response = client.get(
+            JOBS,
+            params={"search": "backend"},
             headers=auth_header(hr_token),
         )
 
@@ -136,6 +147,8 @@ class TestJobRoutes:
         body = response.json()
         assert body["total"] == 1
         assert body["items"][0]["title"] == "Backend Engineer"
+        assert broad_response.status_code == 200
+        assert broad_response.json()["total"] == 2
 
     def test_candidate_cannot_view_closed_job(
         self,
@@ -291,3 +304,41 @@ class TestApplicationRoutes:
         assert body["total_applications"] == 2
         assert body["applications_by_status"]["reviewed"] == 1
         assert body["applications_by_status"]["rejected"] == 1
+        assert body["recent_applications"][0]["candidate"]["email"] == candidate_user.email
+        assert body["hiring_velocity"]["window_days"] == 30
+        assert body["hiring_velocity"]["total_applications"] == 2
+        assert body["hiring_velocity"]["average_weekly_applications"] == 0.5
+        assert len(body["hiring_velocity"]["buckets"]) == 4
+        assert sum(bucket["applications"] for bucket in body["hiring_velocity"]["buckets"]) == 2
+
+    def test_candidate_profile_drives_recommendations(
+        self,
+        client: TestClient,
+        db: Session,
+        hr_user: User,
+        candidate_token: str,
+    ):
+        create_job(db, hr_user, title="React Product Engineer", location="Remote")
+        create_job(db, hr_user, title="Payroll Analyst", location="Remote")
+
+        update_response = client.put(
+            CANDIDATE_PROFILE,
+            json={
+                "resume_url": "https://example.com/resume.pdf",
+                "skills": ["React", "Product", "React"],
+                "work_experience": "Built React product dashboards for hiring teams.",
+            },
+            headers=auth_header(candidate_token),
+        )
+        recommendations_response = client.get(
+            CANDIDATE_RECOMMENDATIONS,
+            headers=auth_header(candidate_token),
+        )
+
+        assert update_response.status_code == 200
+        assert update_response.json()["skills"] == ["react", "product"]
+        assert update_response.json()["profile_strength"] == 100
+        assert recommendations_response.status_code == 200
+        recommendations = recommendations_response.json()
+        assert recommendations[0]["job"]["title"] == "React Product Engineer"
+        assert "react" in recommendations[0]["matched_skills"]
