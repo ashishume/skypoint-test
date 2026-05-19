@@ -109,7 +109,7 @@ class ApplicationService:
         return self.application_repo.save(application)
 
     def hr_dashboard(self) -> HrDashboardResponse:
-        job_counts = self.application_repo.job_status_counts()
+        job_counts = self.job_repo.status_counts()
         app_counts = self.application_repo.status_counts()
         total_jobs = sum(job_counts.values())
         total_apps = sum(app_counts.values())

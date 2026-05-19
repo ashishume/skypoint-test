@@ -46,7 +46,7 @@ def create_job(
     job = JobPosting(
         title=title,
         description="Build reliable APIs for hiring teams.",
-        skills=", ".join(skills or ["python", "fastapi"]),
+        skills=list(skills or ["python", "fastapi"]),
         location=location,
         job_type=job_type,
         salary_min=100000,
@@ -149,20 +149,31 @@ class TestJobRoutes:
     ):
         create_job(db, hr_user, title="Backend Engineer", location="Remote")
         create_job(db, hr_user, title="Design Lead", location="Bangalore", job_type=JobType.CONTRACT)
-
-        description_match = create_job(db, hr_user, title="Frontend Developer", location="Pune")
-        description_match.description = "Build reliable APIs for candidates."
-        description_match.skills = "backend, typescript"
-        db.commit()
+        create_job(
+            db,
+            hr_user,
+            title="Frontend Developer",
+            location="Pune",
+            skills=["backend", "typescript"],
+        )
 
         response = client.get(
             JOBS,
             params={"search": "Backend", "location": "remote", "job_type": "full_time"},
             headers=auth_header(hr_token),
         )
+        # Free-text search scans title/description/location and exact skill tokens.
         broad_response = client.get(
             JOBS,
             params={"search": "backend"},
+            headers=auth_header(hr_token),
+        )
+        # Dedicated skill filter uses JSON-token matching: it matches
+        # Frontend Developer (skill=backend) and Backend Engineer (default
+        # seeded skills don't include backend) — only the Frontend Developer.
+        skill_response = client.get(
+            JOBS,
+            params={"skill": "backend"},
             headers=auth_header(hr_token),
         )
 
@@ -172,6 +183,30 @@ class TestJobRoutes:
         assert body["items"][0]["title"] == "Backend Engineer"
         assert broad_response.status_code == 200
         assert broad_response.json()["total"] == 2
+        assert skill_response.status_code == 200
+        assert skill_response.json()["total"] == 1
+        assert skill_response.json()["items"][0]["title"] == "Frontend Developer"
+
+    def test_skill_filter_uses_token_match_not_substring(
+        self,
+        client: TestClient,
+        db: Session,
+        hr_user: User,
+        hr_token: str,
+    ):
+        # Regression: substring-based skill matching used to falsely match
+        # "go" against "django" / "mongo". The new JSON-token-aware filter
+        # must not.
+        create_job(db, hr_user, title="Go Backend", skills=["go", "kubernetes"])
+        create_job(db, hr_user, title="Django Backend", skills=["django", "python"])
+        create_job(db, hr_user, title="Mongo Engineer", skills=["mongo", "python"])
+
+        response = client.get(JOBS, params={"skill": "go"}, headers=auth_header(hr_token))
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["total"] == 1
+        assert body["items"][0]["title"] == "Go Backend"
 
     def test_candidate_cannot_view_closed_job(
         self,

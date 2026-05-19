@@ -15,7 +15,10 @@
       "Bash(.venv/bin/python -m pytest)",
       "Bash(.venv/bin/python *)",
       "Bash(/Users/ashish-mac/Downloads/Github/skypoint-test/fastapi-app/.venv/bin/python *)",
-      "Bash(grep -rnE \"\\(secret|password|key|invite\\)\\\\s*=\\\\s*['\\\\\"][A-Za-z0-9@!#\\\\$%^&*_\\\\-]{8,}['\\\\\"]\" app/ --include=\"*.py\")"
+      "Bash(grep -rnE \"\\(secret|password|key|invite\\)\\\\s*=\\\\s*['\\\\\"][A-Za-z0-9@!#\\\\$%^&*_\\\\-]{8,}['\\\\\"]\" app/ --include=\"*.py\")",
+      "Bash(python -m pytest tests/ -x --tb=short)",
+      "Bash(python3 -m pytest tests/ -x --tb=short)",
+      "Bash(npx tsc *)"
     ]
   }
 }

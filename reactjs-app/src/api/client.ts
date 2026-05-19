@@ -109,6 +109,7 @@ export const jobsApi = {
     location?: string;
     job_type?: JobType;
     search?: string;
+    skill?: string;
     salary_min?: number;
     salary_max?: number;
   } = {}) => {

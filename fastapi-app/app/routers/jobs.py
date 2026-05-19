@@ -48,6 +48,7 @@ def list_jobs(
     location: Annotated[Optional[str], Query(max_length=255)] = None,
     job_type: Optional[JobType] = None,
     search: Annotated[Optional[str], Query(max_length=255)] = None,
+    skill: Annotated[Optional[str], Query(max_length=64)] = None,
     salary_min: Annotated[Optional[int], Query(ge=0, le=10_000_000)] = None,
     salary_max: Annotated[Optional[int], Query(ge=0, le=10_000_000)] = None,
 ) -> Page[JobResponse]:
@@ -61,6 +62,7 @@ def list_jobs(
         location=location,
         job_type=job_type,
         search=search,
+        skill=skill,
         salary_min=salary_min,
         salary_max=salary_max,
     )

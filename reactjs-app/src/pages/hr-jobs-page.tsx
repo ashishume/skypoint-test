@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { applicationsApi, getApiError, jobsApi } from "@/api/client";
+import { AlertDialog } from "@/components/ui/alert-dialog";
 import type { ApplicationStatus, Job, JobPayload, JobStatus } from "@/api/types";
 import { EmptyState } from "@/components/common/empty-state";
 import { PaginationControls } from "@/components/common/pagination-controls";
@@ -55,6 +56,7 @@ export default function HrJobsPage() {
   const [editingJob, setEditingJob] = useState<Job | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [applicationsJob, setApplicationsJob] = useState<Job | null>(null);
+  const [deletingJob, setDeletingJob] = useState<Job | null>(null);
   const [page, setPage] = useState(() => parsePositivePage(searchParams.get("page")));
   const [applicationsPage, setApplicationsPage] = useState(1);
   const queryClient = useQueryClient();
@@ -151,9 +153,7 @@ export default function HrJobsPage() {
   });
 
   function confirmDelete(job: Job) {
-    if (window.confirm(`Delete "${job.title}"? Applications for this role will also be removed.`)) {
-      deleteMutation.mutate(job.id);
-    }
+    setDeletingJob(job);
   }
 
   function updateParams(updates: Record<string, string | null>) {
@@ -348,6 +348,19 @@ export default function HrJobsPage() {
           ) : null}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={Boolean(deletingJob)}
+        title={`Delete "${deletingJob?.title}"?`}
+        description="Applications for this role will also be permanently removed. This cannot be undone."
+        confirmLabel="Delete"
+        isDestructive
+        onConfirm={() => {
+          if (deletingJob) deleteMutation.mutate(deletingJob.id);
+          setDeletingJob(null);
+        }}
+        onCancel={() => setDeletingJob(null)}
+      />
 
       <Dialog open={Boolean(applicationsJob)} onOpenChange={(open) => !open && closeApplicantsDialog()}>
         <DialogContent className="max-w-4xl">

@@ -1,31 +1,14 @@
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import {
-  BriefcaseBusiness,
-  ClipboardList,
-  LayoutDashboard,
-  LogOut,
-  Search,
-  UserRound,
-} from "lucide-react";
+import { ClipboardList, LayoutDashboard, LogOut, Search, UserRound } from "lucide-react";
 import { useAuth } from "@/app/auth-context";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
-const topNav = [
-  { to: "/hr/jobs", label: "Jobs", enabled: true },
-];
-
 const sideNav = [
   { to: "/hr", label: "Dashboard", icon: LayoutDashboard, enabled: true },
   { to: "/hr/jobs", label: "Active Searches", icon: Search, enabled: true },
-];
-
-const candidateNav = [
-  { to: "/candidate/jobs", label: "Jobs", icon: BriefcaseBusiness },
-  { to: "/candidate/applications", label: "Applications", icon: ClipboardList },
-  { to: "/candidate/profile", label: "Profile", icon: UserRound },
 ];
 
 const candidateSideNav = [
@@ -60,46 +43,6 @@ export function AppLayout() {
             <Link to={isHr ? "/hr" : "/candidate/jobs"} className="shrink-0 text-2xl font-bold tracking-tight">
               TalentFlow
             </Link>
-            <nav className="hidden items-center gap-7 md:flex">
-              {isHr
-                ? topNav.map((item) =>
-                    item.enabled ? (
-                      <Link
-                        key={item.label}
-                        to={item.to}
-                        className={cn(
-                          "border-b-2 border-transparent py-5 text-sm font-semibold text-slate-600 transition-colors hover:text-blue-700",
-                          (location.pathname === "/hr" || location.pathname.startsWith(item.to)) &&
-                            "border-blue-700 text-blue-700"
-                        )}
-                      >
-                        {item.label}
-                      </Link>
-                    ) : (
-                      <span
-                        key={item.label}
-                        className="cursor-not-allowed py-5 text-sm font-semibold text-slate-500"
-                        title="Planned feature"
-                      >
-                        {item.label}
-                      </span>
-                    )
-                  )
-                : candidateNav.map(({ to, label }) => (
-                    <NavLink
-                      key={to}
-                      to={to}
-                      className={({ isActive }) =>
-                        cn(
-                          "border-b-2 border-transparent py-5 text-sm font-semibold text-slate-600 transition-colors hover:text-blue-700",
-                          isActive && "border-blue-700 text-blue-700"
-                        )
-                      }
-                    >
-                      {label}
-                    </NavLink>
-                  ))}
-            </nav>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-4">

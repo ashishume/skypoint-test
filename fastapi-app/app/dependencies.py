@@ -61,8 +61,11 @@ CandidateProfileRepoDep = Annotated[
 ]
 
 
-def get_user_service(repo: UserRepoDep) -> UserService:
-    return UserService(repo)
+def get_user_service(
+    repo: UserRepoDep,
+    profile_repo: CandidateProfileRepoDep,
+) -> UserService:
+    return UserService(repo, profile_repo)
 
 
 def get_auth_service(repo: UserRepoDep) -> AuthService:

@@ -6,7 +6,6 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import joinedload
 
 from app.models.application import Application, ApplicationStatus
-from app.models.job import JobPosting, JobStatus
 from app.repositories.base import BaseRepository
 
 
@@ -89,14 +88,3 @@ class ApplicationRepository(BaseRepository[Application]):
             .order_by(Application.created_at.asc(), Application.id.asc())
         )
         return list(self.db.execute(stmt).scalars().all())
-
-    def job_status_counts(self) -> Dict[JobStatus, int]:
-        """Helper used by HR dashboard: count of jobs by status."""
-        rows = self.db.execute(
-            select(JobPosting.status, func.count(JobPosting.id))
-            .group_by(JobPosting.status)
-        ).all()
-        counts: Dict[JobStatus, int] = {s: 0 for s in JobStatus}
-        for status, count in rows:
-            counts[status] = int(count)
-        return counts

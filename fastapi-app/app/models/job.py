@@ -2,7 +2,7 @@
 from enum import Enum as PyEnum
 from typing import TYPE_CHECKING, List, Optional
 
-from sqlalchemy import Enum, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import JSON, Enum, ForeignKey, Index, Integer, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
@@ -30,7 +30,11 @@ class JobPosting(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(primary_key=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     description: Mapped[str] = mapped_column(Text, nullable=False)
-    skills: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
+    # JSON here; production would use JSONB (PostgreSQL) and normalise into a
+    # job_skills join table for indexed filtering and many-to-many skill reuse.
+    skills: Mapped[List[str]] = mapped_column(
+        JSON, nullable=False, default=list, server_default=text("'[]'")
+    )
     location: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     job_type: Mapped[JobType] = mapped_column(
         Enum(JobType, native_enum=False, length=20, validate_strings=True),

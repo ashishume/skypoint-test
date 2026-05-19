@@ -7,13 +7,12 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from app.models.job import JobStatus, JobType
 
 
-def normalize_job_skills(value: List[str] | str | None) -> List[str]:
-    if value is None:
+def normalize_job_skills(value: List[str] | None) -> List[str]:
+    if not value:
         return []
-    raw_skills = value.split(",") if isinstance(value, str) else value
     seen: set[str] = set()
     normalized: list[str] = []
-    for skill in raw_skills:
+    for skill in value:
         item = skill.strip().lower()
         if item and item not in seen:
             seen.add(item)
@@ -32,7 +31,7 @@ class JobBase(BaseModel):
 
     @field_validator("skills", mode="before")
     @classmethod
-    def _normalize_skills(cls, value: List[str] | str | None) -> List[str]:
+    def _normalize_skills(cls, value: List[str] | None) -> List[str]:
         return normalize_job_skills(value)
 
 
@@ -64,7 +63,7 @@ class JobUpdate(BaseModel):
 
     @field_validator("skills", mode="before")
     @classmethod
-    def _normalize_skills(cls, value: List[str] | str | None) -> List[str]:
+    def _normalize_skills(cls, value: List[str] | None) -> List[str]:
         return normalize_job_skills(value)
 
     @model_validator(mode="after")

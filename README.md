@@ -582,3 +582,12 @@ README updated with current architecture, run flow, test credentials, feature wa
 - No JWT refresh tokens — expiry requires re-login.
 - Auth rate limiting is in-memory and per backend worker; use a shared store such as Redis for horizontally scaled deployments.
 - Metrics/traces are not included.
+
+### Deliberate trade-offs (known, not overlooked)
+
+| Decision | Why it was made | Production path |
+|---|---|---|
+| **In-memory rate limiter** | Zero extra dependencies; sufficient for a single-instance assessment environment. | Replace with a Redis-backed store (e.g. `slowapi` + Redis) so limits are shared across all uvicorn workers and survive restarts. |
+| **JWT stored in `localStorage`** | Simple to implement; no cookie/CSRF machinery needed for the assessment scope. | Move to `HttpOnly` + `Secure` cookies to eliminate XSS token-theft risk; add CSRF protection (double-submit or `SameSite=Strict`). |
+| **Synchronous recommendation algorithm** | Avoids a background-task dependency (Celery/RQ) while still demonstrating the skill-matching logic. | Offload to an async worker so the HTTP response time is not coupled to recommendation computation; add a dedicated recommendations table for caching results. |
+| **Skills as JSON column** | Keeps the schema simple and avoids a join table for this scale. | Normalise into a `skills` lookup table + `job_skills` / `candidate_skills` join tables, and switch the column type to JSONB (PostgreSQL) for GIN-indexed containment queries. |

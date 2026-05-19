@@ -29,10 +29,13 @@ import {
 import { ProfileStrengthCard } from "@/features/profile/profile-strength-card";
 import { formatDate, jobTypeLabels } from "@/lib/format";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
+import { useAuth } from "@/app/auth-context";
 
 const JOBS_PAGE_SIZE = 6;
 
 export default function CandidateJobsPage() {
+  const { user } = useAuth();
+  const firstName = user?.full_name?.split(" ")[0] ?? "there";
   const [draftKeyword, setDraftKeyword] = useState("");
   const [draftLocation, setDraftLocation] = useState("");
   const [draftSalaryRange, setDraftSalaryRange] = useState("any");
@@ -127,7 +130,7 @@ export default function CandidateJobsPage() {
     <>
       <PageHeader
         eyebrow="Candidate workspace"
-        title="Good Morning, Alex"
+        title={`Good Morning, ${firstName}`}
         description="Here is what's happening with your job search today."
       />
       <section className="space-y-8 px-4 py-6 sm:px-6 lg:px-8">

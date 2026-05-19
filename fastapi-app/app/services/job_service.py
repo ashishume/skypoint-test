@@ -9,10 +9,6 @@ from app.repositories.job_repository import JobRepository
 from app.schemas.job import JobCreate, JobResponse, JobUpdate
 
 
-def _join_skills(skills: list[str]) -> str:
-    return ", ".join(skills)
-
-
 class JobService:
     def __init__(self, job_repo: JobRepository) -> None:
         self.job_repo = job_repo
@@ -21,7 +17,7 @@ class JobService:
         job = JobPosting(
             title=payload.title.strip(),
             description=payload.description.strip(),
-            skills=_join_skills(payload.skills),
+            skills=list(payload.skills),
             location=payload.location.strip(),
             job_type=payload.job_type,
             salary_min=payload.salary_min,
@@ -49,6 +45,7 @@ class JobService:
         location: Optional[str] = None,
         job_type: Optional[JobType] = None,
         search: Optional[str] = None,
+        skill: Optional[str] = None,
         salary_min: Optional[int] = None,
         salary_max: Optional[int] = None,
     ) -> Page[JobResponse]:
@@ -59,6 +56,7 @@ class JobService:
             location=location,
             job_type=job_type,
             search=search,
+            skill=skill,
             salary_min=salary_min,
             salary_max=salary_max,
         )
@@ -73,8 +71,8 @@ class JobService:
         data = payload.model_dump(exclude_unset=True)
         for field, value in data.items():
             if field == "skills" and isinstance(value, list):
-                value = _join_skills(value)
-            if isinstance(value, str):
+                value = list(value)
+            elif isinstance(value, str):
                 value = value.strip()
             setattr(job, field, value)
         return self.job_repo.save(job)
