@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p fastapi-app)",
+      "Bash(python3 -m venv venv)",
+      "Bash(pip install *)",
+      "Bash(npm create *)",
+      "Bash(npm install *)"
+    ]
+  }
+}
