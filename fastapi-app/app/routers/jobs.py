@@ -14,7 +14,7 @@ from app.dependencies import (
 from app.models.application import ApplicationStatus
 from app.models.job import JobStatus, JobType
 from app.models.user import UserRole
-from app.schemas.application import ApplicationWithCandidate
+from app.schemas.application import ApplicationWithCandidateProfile
 from app.schemas.job import JobCreate, JobResponse, JobUpdate
 
 router = APIRouter()
@@ -115,7 +115,7 @@ def delete_job(
 
 @router.get(
     "/{job_id}/applications",
-    response_model=Page[ApplicationWithCandidate],
+    response_model=Page[ApplicationWithCandidateProfile],
     summary="List applicants for a job (HR only)",
 )
 def list_job_applications(
@@ -124,5 +124,5 @@ def list_job_applications(
     service: ApplicationServiceDep,
     pagination: Annotated[PaginationParams, Depends()],
     status_filter: Annotated[Optional[ApplicationStatus], Query(alias="status")] = None,
-) -> Page[ApplicationWithCandidate]:
+) -> Page[ApplicationWithCandidateProfile]:
     return service.list_for_job(job_id, pagination, status=status_filter)

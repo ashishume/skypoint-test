@@ -5,6 +5,7 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
 from app.models.application import ApplicationStatus
+from app.schemas.candidate_profile import CandidateProfileResponse
 from app.schemas.job import JobResponse
 from app.schemas.user import UserPublic
 
@@ -48,3 +49,12 @@ class ApplicationWithJobAndCandidate(ApplicationWithJob):
     """Returned to HR dashboards so recent applications include context."""
 
     candidate: UserPublic
+
+
+class ApplicationWithCandidateProfile(ApplicationWithJobAndCandidate):
+    """Returned to HR when candidate fit/profile context is needed."""
+
+    candidate_profile: CandidateProfileResponse
+    match_score: int
+    matched_skills: list[str]
+    match_reason: str

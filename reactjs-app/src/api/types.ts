@@ -109,6 +109,13 @@ export interface ApplicationWithJobAndCandidate extends ApplicationWithJob {
   candidate: PublicUser;
 }
 
+export interface ApplicationWithCandidateProfile extends ApplicationWithJobAndCandidate {
+  candidate_profile: CandidateProfile;
+  match_score: number;
+  matched_skills: string[];
+  match_reason: string;
+}
+
 export interface HiringVelocityBucket {
   label: string;
   start_date: string;

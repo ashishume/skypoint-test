@@ -31,7 +31,7 @@ services:
       SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-me-please-32-chars-minimum}
       HR_INVITE_CODE: ${HR_INVITE_CODE:-hr-invite-code-min-8-chars}
       APP_ENV: ${APP_ENV:-development}
-      APP_NAME: ${APP_NAME:-Job Recruitment Platform}
+      APP_NAME: ${APP_NAME:-RecruitFlow}
       API_V1_PREFIX: ${API_V1_PREFIX:-/api/v1}
       ALGORITHM: ${ALGORITHM:-HS256}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}

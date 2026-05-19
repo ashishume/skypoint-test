@@ -79,8 +79,9 @@ def get_job_service(repo: JobRepoDep) -> JobService:
 def get_application_service(
     application_repo: ApplicationRepoDep,
     job_repo: JobRepoDep,
+    profile_repo: CandidateProfileRepoDep,
 ) -> ApplicationService:
-    return ApplicationService(application_repo, job_repo)
+    return ApplicationService(application_repo, job_repo, profile_repo)
 
 
 def get_candidate_profile_service(

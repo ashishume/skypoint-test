@@ -20,7 +20,7 @@ export function CandidatePipelinePanel({ columns }: CandidatePipelinePanelProps)
     <AnimatedPanel delay={0.25} className="overflow-hidden">
       <div className="flex items-center justify-between border-b border-slate-200 px-4 py-4 sm:px-5">
         <h2 className="text-xl font-bold tracking-tight">Candidate Pipeline</h2>
-        <Link to="/hr/jobs" className="text-sm font-bold text-blue-700 hover:underline">
+        <Link to="/hr/candidates" className="text-sm font-bold text-blue-700 hover:underline">
           View All Pipeline
         </Link>
       </div>

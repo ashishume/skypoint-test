@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { applicationsApi, getApiError, jobsApi } from "@/api/client";
-import type { ApplicationStatus } from "@/api/types";
+import type { ApplicationStatus, ApplicationWithCandidateProfile } from "@/api/types";
 import { PageHeader } from "@/components/common/page-header";
 import { JobStatusBadge } from "@/components/common/status-badge";
 import { AlertDialog } from "@/components/ui/alert-dialog";
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApplicantsTable } from "@/features/jobs/applicants-table";
+import { CandidateProfileDialog } from "@/features/candidates/candidate-profile-dialog";
 import { applicationStatusLabels, formatCurrencyRange, formatDate, jobTypeLabels } from "@/lib/format";
 
 const APPLICANTS_PAGE_SIZE = 8;
@@ -32,6 +33,7 @@ export default function HrJobDetailsPage() {
   const queryClient = useQueryClient();
   const jobId = Number(params.jobId);
   const [isCloseDialogOpen, setIsCloseDialogOpen] = useState(false);
+  const [selectedApplication, setSelectedApplication] = useState<ApplicationWithCandidateProfile | null>(null);
   const validJobId = Number.isInteger(jobId) && jobId > 0 ? jobId : null;
   const applicationStatusFilter = parseApplicationStatus(searchParams.get("applicationStatus"));
   const applicantsPage = parsePositivePage(searchParams.get("page"));
@@ -214,6 +216,7 @@ export default function HrJobDetailsPage() {
               page={applicationsQuery.data}
               isLoading={applicationsQuery.isLoading}
               onPageChange={setApplicantsPage}
+              onViewCandidate={setSelectedApplication}
               onStatusChange={(application, status) =>
                 statusMutation.mutate({ id: application.id, status })
               }
@@ -228,6 +231,11 @@ export default function HrJobDetailsPage() {
         confirmLabel="Close job"
         onConfirm={() => closeMutation.mutate()}
         onCancel={() => setIsCloseDialogOpen(false)}
+      />
+      <CandidateProfileDialog
+        application={selectedApplication}
+        open={Boolean(selectedApplication)}
+        onOpenChange={(open) => !open && setSelectedApplication(null)}
       />
     </>
   );

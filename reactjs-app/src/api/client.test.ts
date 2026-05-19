@@ -114,6 +114,7 @@ describe("api client", () => {
 
     await applicationsApi.apply({ job_id: 1, cover_letter: "I am a strong fit." });
     await applicationsApi.mine({ status: "reviewed", open_jobs_only: true });
+    await applicationsApi.hrList({ status: "pending", search: "alex" });
     await applicationsApi.updateStatus(1, "shortlisted");
     await dashboardApi.hr();
 
@@ -123,6 +124,9 @@ describe("api client", () => {
     });
     expect(get).toHaveBeenCalledWith("/applications/my", {
       params: { status: "reviewed", open_jobs_only: true },
+    });
+    expect(get).toHaveBeenCalledWith("/applications/hr", {
+      params: { status: "pending", search: "alex" },
     });
     expect(patch).toHaveBeenCalledWith("/applications/1/status", { status: "shortlisted" });
     expect(get).toHaveBeenCalledWith("/hr/dashboard");

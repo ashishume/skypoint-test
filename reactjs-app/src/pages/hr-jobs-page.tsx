@@ -1,14 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArchiveX, Edit, Eye, FileText, Plus, Search, Trash2, X } from "lucide-react";
+import { ArchiveX, Edit, Eye, FileText, LayoutGrid, List, MoreHorizontal, Plus, Search, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { applicationsApi, getApiError, jobsApi } from "@/api/client";
 import { AlertDialog } from "@/components/ui/alert-dialog";
-import type { ApplicationStatus, Job, JobPayload, JobStatus } from "@/api/types";
+import type { ApplicationStatus, ApplicationWithCandidateProfile, Job, JobPayload, JobStatus } from "@/api/types";
 import { EmptyState } from "@/components/common/empty-state";
 import { PaginationControls } from "@/components/common/pagination-controls";
 import { PageHeader } from "@/components/common/page-header";
+import { JobStatusBadge } from "@/components/common/status-badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,6 +18,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -26,10 +34,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ApplicantsTable } from "@/features/jobs/applicants-table";
+import { CandidateProfileDialog } from "@/features/candidates/candidate-profile-dialog";
 import { JobForm } from "@/features/jobs/job-form";
 import { JobCard } from "@/features/jobs/job-card";
-import { applicationStatusLabels, jobStatusLabels } from "@/lib/format";
+import { applicationStatusLabels, formatCurrencyRange, formatDate, jobStatusLabels, jobTypeLabels } from "@/lib/format";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 
 const applicationStatuses = Object.keys(applicationStatusLabels) as ApplicationStatus[];
@@ -58,6 +68,8 @@ export default function HrJobsPage() {
   const [applicationsJob, setApplicationsJob] = useState<Job | null>(null);
   const [deletingJob, setDeletingJob] = useState<Job | null>(null);
   const [closingJob, setClosingJob] = useState<Job | null>(null);
+  const [selectedApplication, setSelectedApplication] = useState<ApplicationWithCandidateProfile | null>(null);
+  const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [page, setPage] = useState(() => parsePositivePage(searchParams.get("page")));
   const [applicationsPage, setApplicationsPage] = useState(1);
   const queryClient = useQueryClient();
@@ -245,6 +257,26 @@ export default function HrJobsPage() {
               ))}
             </SelectContent>
           </Select>
+          <div className="grid grid-cols-2 rounded-md border bg-white p-1">
+            <Button
+              type="button"
+              variant={viewMode === "grid" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("grid")}
+            >
+              <LayoutGrid className="h-4 w-4" />
+              Grid
+            </Button>
+            <Button
+              type="button"
+              variant={viewMode === "list" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("list")}
+            >
+              <List className="h-4 w-4" />
+              List
+            </Button>
+          </div>
         </div>
         {activeFilterLabel ? (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm">
@@ -272,61 +304,88 @@ export default function HrJobsPage() {
           </div>
         ) : jobsQuery.data?.items.length ? (
           <>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {jobsQuery.data.items.map((job) => (
-                <JobCard
-                  key={job.id}
-                  job={job}
-                  showApplicantsCount
-                  actions={
-                    <div className="grid w-full grid-cols-2 gap-2">
-                      <Button type="button" variant="outline" asChild>
-                        <Link to={`/hr/jobs/${job.id}`}>
-                          <Eye className="h-4 w-4" />
-                          Details
-                        </Link>
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          setApplicationsJob(job);
-                          updateParams({ jobId: String(job.id) });
-                        }}
-                      >
-                        <FileText className="h-4 w-4" />
-                        Applicants
-                      </Button>
-                      <Button type="button" variant="outline" onClick={() => setEditingJob(job)}>
-                        <Edit className="h-4 w-4" />
-                        Edit
-                      </Button>
-                      {job.status === "open" ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => confirmClose(job)}
-                          disabled={closeMutation.isPending}
-                        >
-                          <ArchiveX className="h-4 w-4" />
-                          Close
-                        </Button>
-                      ) : null}
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        onClick={() => confirmDelete(job)}
-                        disabled={deleteMutation.isPending}
-                        className={job.status === "open" ? "" : "col-span-2"}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        Delete
-                      </Button>
-                    </div>
-                  }
-                />
-              ))}
-            </div>
+            {viewMode === "grid" ? (
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {jobsQuery.data.items.map((job) => (
+                  <JobCard
+                    key={job.id}
+                    job={job}
+                    showApplicantsCount
+                    actions={
+                      <div className="grid w-full grid-cols-[1fr_1fr_auto] gap-2">
+                        <JobPrimaryActions job={job} openApplicants={(selectedJob) => {
+                          setApplicationsJob(selectedJob);
+                          updateParams({ jobId: String(selectedJob.id) });
+                        }} />
+                        <JobMoreMenu
+                          job={job}
+                          isClosing={closeMutation.isPending}
+                          isDeleting={deleteMutation.isPending}
+                          onEdit={setEditingJob}
+                          onClose={confirmClose}
+                          onDelete={confirmDelete}
+                        />
+                      </div>
+                    }
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="overflow-hidden rounded-lg border bg-white shadow-sm">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Applicants</TableHead>
+                      <TableHead>Compensation</TableHead>
+                      <TableHead>Posted</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {jobsQuery.data.items.map((job) => (
+                      <TableRow key={job.id}>
+                        <TableCell>
+                          <div className="min-w-64">
+                            <div className="font-bold text-slate-900">{job.title}</div>
+                            <div className="mt-1 text-sm font-medium text-muted-foreground">
+                              {job.location} · {jobTypeLabels[job.job_type]}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <JobStatusBadge status={job.status} />
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-bold text-slate-900">{job.applications_count}</span>
+                        </TableCell>
+                        <TableCell className="font-medium text-muted-foreground">
+                          {formatCurrencyRange(job.salary_min, job.salary_max)}
+                        </TableCell>
+                        <TableCell className="font-medium text-muted-foreground">{formatDate(job.created_at)}</TableCell>
+                        <TableCell>
+                          <div className="flex justify-end gap-2">
+                            <JobPrimaryActions job={job} openApplicants={(selectedJob) => {
+                              setApplicationsJob(selectedJob);
+                              updateParams({ jobId: String(selectedJob.id) });
+                            }} compact />
+                            <JobMoreMenu
+                              job={job}
+                              isClosing={closeMutation.isPending}
+                              isDeleting={deleteMutation.isPending}
+                              onEdit={setEditingJob}
+                              onClose={confirmClose}
+                              onDelete={confirmDelete}
+                            />
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
             <PaginationControls
               limit={jobsQuery.data.limit}
               offset={jobsQuery.data.offset}
@@ -414,12 +473,90 @@ export default function HrJobsPage() {
             page={applicationsQuery.data}
             isLoading={applicationsQuery.isLoading}
             onPageChange={setApplicationsPage}
+            onViewCandidate={setSelectedApplication}
             onStatusChange={(application, status) =>
               statusMutation.mutate({ id: application.id, status })
             }
           />
         </DialogContent>
       </Dialog>
+      <CandidateProfileDialog
+        application={selectedApplication}
+        open={Boolean(selectedApplication)}
+        onOpenChange={(open) => !open && setSelectedApplication(null)}
+      />
     </>
+  );
+}
+
+function JobPrimaryActions({
+  job,
+  openApplicants,
+  compact = false,
+}: {
+  job: Job;
+  openApplicants: (job: Job) => void;
+  compact?: boolean;
+}) {
+  return (
+    <>
+      <Button type="button" variant="outline" size={compact ? "sm" : "default"} asChild>
+        <Link to={`/hr/jobs/${job.id}`}>
+          <Eye className="h-4 w-4" />
+          Details
+        </Link>
+      </Button>
+      <Button type="button" variant="outline" size={compact ? "sm" : "default"} onClick={() => openApplicants(job)}>
+        <FileText className="h-4 w-4" />
+        Applicants
+      </Button>
+    </>
+  );
+}
+
+function JobMoreMenu({
+  job,
+  isClosing,
+  isDeleting,
+  onEdit,
+  onClose,
+  onDelete,
+}: {
+  job: Job;
+  isClosing: boolean;
+  isDeleting: boolean;
+  onEdit: (job: Job) => void;
+  onClose: (job: Job) => void;
+  onDelete: (job: Job) => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button type="button" variant="outline" size="icon" aria-label={`More actions for ${job.title}`}>
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-44">
+        <DropdownMenuItem onSelect={() => onEdit(job)}>
+          <Edit className="h-4 w-4" />
+          Edit
+        </DropdownMenuItem>
+        {job.status === "open" ? (
+          <DropdownMenuItem disabled={isClosing} onSelect={() => onClose(job)}>
+            <ArchiveX className="h-4 w-4" />
+            Close
+          </DropdownMenuItem>
+        ) : null}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          disabled={isDeleting}
+          onSelect={() => onDelete(job)}
+          className="text-red-600 focus:bg-red-50 focus:text-red-700"
+        >
+          <Trash2 className="h-4 w-4" />
+          Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

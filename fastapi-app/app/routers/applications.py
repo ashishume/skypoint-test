@@ -14,6 +14,7 @@ from app.schemas.application import (
     ApplicationCreate,
     ApplicationResponse,
     ApplicationStatusUpdate,
+    ApplicationWithCandidateProfile,
     ApplicationWithJob,
 )
 
@@ -52,6 +53,28 @@ def list_my_applications(
         pagination,
         status=status_filter,
         open_jobs_only=open_jobs_only,
+    )
+
+
+@router.get(
+    "/hr",
+    response_model=Page[ApplicationWithCandidateProfile],
+    summary="List candidates who applied to the current HR user's jobs",
+)
+def list_hr_applications(
+    hr: HrUser,
+    service: ApplicationServiceDep,
+    pagination: Annotated[PaginationParams, Depends()],
+    status_filter: Annotated[Optional[ApplicationStatus], Query(alias="status")] = None,
+    job_id: Annotated[Optional[int], Query(gt=0)] = None,
+    search: Annotated[Optional[str], Query(max_length=255)] = None,
+) -> Page[ApplicationWithCandidateProfile]:
+    return service.list_for_hr_jobs(
+        hr,
+        pagination,
+        status=status_filter,
+        job_id=job_id,
+        search=search,
     )
 
 

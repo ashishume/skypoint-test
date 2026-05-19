@@ -2,11 +2,13 @@
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
-from sqlalchemy import func, select
+from sqlalchemy import String, cast, func, select
 from sqlalchemy.orm import joinedload
 
 from app.models.application import Application, ApplicationStatus
+from app.models.candidate_profile import CandidateProfile
 from app.models.job import JobPosting, JobStatus
+from app.models.user import User
 from app.repositories.base import BaseRepository
 
 
@@ -73,6 +75,51 @@ class ApplicationRepository(BaseRepository[Application]):
         )
         if status is not None:
             stmt = stmt.where(Application.status == status)
+        return self.paginate(stmt, limit=limit, offset=offset)
+
+    def list_for_hr_jobs(
+        self,
+        *,
+        hr_user_id: int,
+        limit: int,
+        offset: int,
+        status: Optional[ApplicationStatus] = None,
+        job_id: Optional[int] = None,
+        search: Optional[str] = None,
+    ) -> Tuple[List[Application], int]:
+        stmt = (
+            select(Application)
+            .join(Application.job)
+            .join(Application.candidate)
+            .options(joinedload(Application.job), joinedload(Application.candidate))
+            .where(JobPosting.created_by_id == hr_user_id)
+            .order_by(Application.created_at.desc(), Application.id.desc())
+        )
+        if status is not None:
+            stmt = stmt.where(Application.status == status)
+        if job_id is not None:
+            stmt = stmt.where(Application.job_id == job_id)
+        normalized_search = search.strip().lower() if search else ""
+        if normalized_search:
+            term = f"%{normalized_search}%"
+            job_skills_text = func.lower(cast(JobPosting.skills, String))
+            profile_skills_text = func.lower(cast(CandidateProfile.skills, String))
+            preferred_roles_text = func.lower(cast(CandidateProfile.preferred_roles, String))
+            stmt = stmt.where(
+                func.lower(User.full_name).like(term)
+                | func.lower(User.email).like(term)
+                | func.lower(JobPosting.title).like(term)
+                | func.lower(JobPosting.location).like(term)
+                | func.lower(JobPosting.description).like(term)
+                | job_skills_text.like(term)
+                | Application.candidate_id.in_(
+                    select(CandidateProfile.candidate_id).where(
+                        func.lower(CandidateProfile.work_experience).like(term)
+                        | profile_skills_text.like(term)
+                        | preferred_roles_text.like(term)
+                    )
+                )
+            )
         return self.paginate(stmt, limit=limit, offset=offset)
 
     def status_counts(self) -> Dict[ApplicationStatus, int]:

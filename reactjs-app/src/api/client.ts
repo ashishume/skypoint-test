@@ -3,7 +3,7 @@ import type {
   ApiErrorPayload,
   Application,
   ApplicationStatus,
-  ApplicationWithCandidate,
+  ApplicationWithCandidateProfile,
   ApplicationWithJob,
   DashboardStats,
   Job,
@@ -135,7 +135,7 @@ export const jobsApi = {
     jobId: number,
     params: { status?: ApplicationStatus; limit?: number; offset?: number } = {}
   ) => {
-    const { data } = await api.get<Page<ApplicationWithCandidate>>(
+    const { data } = await api.get<Page<ApplicationWithCandidateProfile>>(
       `/jobs/${jobId}/applications`,
       { params }
     );
@@ -155,6 +155,16 @@ export const applicationsApi = {
     open_jobs_only?: boolean;
   } = {}) => {
     const { data } = await api.get<Page<ApplicationWithJob>>("/applications/my", { params });
+    return data;
+  },
+  hrList: async (params: {
+    status?: ApplicationStatus;
+    job_id?: number;
+    search?: string;
+    limit?: number;
+    offset?: number;
+  } = {}) => {
+    const { data } = await api.get<Page<ApplicationWithCandidateProfile>>("/applications/hr", { params });
     return data;
   },
   updateStatus: async (id: number, status: ApplicationStatus) => {

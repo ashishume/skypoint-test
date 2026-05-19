@@ -19,7 +19,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    APP_NAME: str = "Job Recruitment Platform"
+    APP_NAME: str = "RecruitFlow"
     APP_ENV: str = "development"
     API_V1_PREFIX: str = "/api/v1"
 

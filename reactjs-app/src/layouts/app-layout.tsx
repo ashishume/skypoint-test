@@ -1,5 +1,5 @@
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { ClipboardList, LayoutDashboard, LogOut, Search, UserRound } from "lucide-react";
+import { ClipboardList, LayoutDashboard, LogOut, Search, UserRound, UsersRound } from "lucide-react";
 import { useAuth } from "@/app/auth-context";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 const sideNav = [
   { to: "/hr", label: "Dashboard", icon: LayoutDashboard, enabled: true },
   { to: "/hr/jobs", label: "Active Searches", icon: Search, enabled: true },
+  { to: "/hr/candidates", label: "Candidates", icon: UsersRound, enabled: true },
 ];
 
 const candidateSideNav = [
@@ -41,7 +42,7 @@ export function AppLayout() {
         <div className="flex h-16 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
           <div className="flex min-w-0 items-center gap-8">
             <Link to={isHr ? "/hr" : "/candidate/jobs"} className="shrink-0 text-2xl font-bold tracking-tight">
-              TalentFlow
+              RecruitFlow
             </Link>
           </div>
 

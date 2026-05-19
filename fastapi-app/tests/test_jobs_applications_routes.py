@@ -2,9 +2,11 @@
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.core.security import hash_password
 from app.models.application import Application, ApplicationStatus
+from app.models.candidate_profile import CandidateProfile
 from app.models.job import JobPosting, JobStatus, JobType
-from app.models.user import User
+from app.models.user import User, UserRole
 
 JOBS = "/api/v1/jobs"
 APPLICATIONS = "/api/v1/applications"
@@ -345,6 +347,77 @@ class TestApplicationRoutes:
         assert list_response.json()["items"][0]["candidate"]["email"] == candidate_user.email
         assert update_response.status_code == 200
         assert update_response.json()["status"] == "shortlisted"
+
+    def test_hr_can_track_candidates_with_profile_match_scores(
+        self,
+        client: TestClient,
+        db: Session,
+        hr_user: User,
+        candidate_user: User,
+        hr_token: str,
+    ):
+        other_hr = User(
+            email="other-hr@test.com",
+            hashed_password=hash_password("OtherHr@123"),
+            full_name="Other HR",
+            role=UserRole.HR,
+        )
+        db.add(other_hr)
+        db.commit()
+        db.refresh(other_hr)
+        job = create_job(db, hr_user, title="Python API Engineer", skills=["python", "fastapi"])
+        other_job = create_job(db, other_hr, title="Hidden Role", skills=["python"])
+        create_application(db, job, candidate_user)
+        create_application(db, other_job, candidate_user)
+        profile = CandidateProfile(
+            candidate_id=candidate_user.id,
+            resume_url="https://example.com/profile-resume.pdf",
+            skills=["python", "fastapi"],
+            work_experience="Built Python and FastAPI services for hiring workflows.",
+            salary_min=100000,
+            salary_max=200000,
+            experience_years=5,
+            preferred_roles=["Python API Engineer"],
+        )
+        db.add(profile)
+        db.commit()
+
+        response = client.get(
+            f"{APPLICATIONS}/hr",
+            params={"search": "python"},
+            headers=auth_header(hr_token),
+        )
+        candidate_response = client.get(
+            f"{APPLICATIONS}/hr",
+            params={"search": "test candidate"},
+            headers=auth_header(hr_token),
+        )
+        skill_response = client.get(
+            f"{APPLICATIONS}/hr",
+            params={"search": "fastapi"},
+            headers=auth_header(hr_token),
+        )
+        missing_response = client.get(
+            f"{APPLICATIONS}/hr",
+            params={"search": "nope"},
+            headers=auth_header(hr_token),
+        )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["total"] == 1
+        item = body["items"][0]
+        assert item["job"]["title"] == "Python API Engineer"
+        assert item["candidate"]["email"] == candidate_user.email
+        assert item["candidate_profile"]["skills"] == ["python", "fastapi"]
+        assert item["match_score"] > 0
+        assert "python" in item["matched_skills"]
+        assert candidate_response.status_code == 200
+        assert candidate_response.json()["total"] == 1
+        assert skill_response.status_code == 200
+        assert skill_response.json()["total"] == 1
+        assert missing_response.status_code == 200
+        assert missing_response.json()["total"] == 0
 
     def test_candidate_cannot_list_job_applications_or_update_status(
         self,

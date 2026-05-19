@@ -1,4 +1,9 @@
-import { BadgeCheck, BriefcaseBusiness, CalendarDays, UserPlus } from "lucide-react";
+import {
+  BadgeCheck,
+  BriefcaseBusiness,
+  CalendarDays,
+  UserPlus,
+} from "lucide-react";
 import type { DashboardStats } from "@/api/types";
 import { compactNumber } from "@/lib/format";
 import { DashboardMetricCard } from "@/features/dashboard/dashboard-metric-card";
@@ -8,7 +13,9 @@ interface MetricGridProps {
 }
 
 export function MetricGrid({ stats }: MetricGridProps) {
-  const scheduled = stats.applications_by_status.reviewed + stats.applications_by_status.shortlisted;
+  const scheduled =
+    stats.applications_by_status.reviewed +
+    stats.applications_by_status.shortlisted;
   const hireTarget = Math.max(10, stats.applications_by_status.shortlisted + 2);
 
   return (
@@ -24,7 +31,7 @@ export function MetricGrid({ stats }: MetricGridProps) {
       />
       <DashboardMetricCard
         delay={0.1}
-        title="New Apps"
+        title="New Jobs"
         value={compactNumber(stats.total_applications)}
         detail={`${stats.applications_by_status.pending} pending review`}
         trend="12% vs last month"

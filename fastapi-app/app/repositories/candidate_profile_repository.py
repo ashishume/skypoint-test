@@ -1,5 +1,5 @@
 """Data-access for candidate profiles."""
-from typing import Optional
+from typing import Dict, List, Optional
 
 from sqlalchemy import select
 
@@ -14,3 +14,15 @@ class CandidateProfileRepository(BaseRepository[CandidateProfile]):
         return self.db.execute(
             select(CandidateProfile).where(CandidateProfile.candidate_id == candidate_id)
         ).scalar_one_or_none()
+
+    def list_by_candidate_ids(
+        self, candidate_ids: List[int]
+    ) -> Dict[int, CandidateProfile]:
+        if not candidate_ids:
+            return {}
+        profiles = self.db.execute(
+            select(CandidateProfile).where(
+                CandidateProfile.candidate_id.in_(candidate_ids)
+            )
+        ).scalars().all()
+        return {profile.candidate_id: profile for profile in profiles}

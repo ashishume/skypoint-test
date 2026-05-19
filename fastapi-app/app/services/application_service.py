@@ -5,14 +5,16 @@ from typing import Optional
 from app.core.exceptions import BadRequestError, ConflictError
 from app.core.pagination import Page, PaginationParams
 from app.models.application import Application, ApplicationStatus
+from app.models.candidate_profile import CandidateProfile
 from app.models.job import JobStatus
 from app.models.user import User
 from app.repositories.application_repository import ApplicationRepository
+from app.repositories.candidate_profile_repository import CandidateProfileRepository
 from app.repositories.job_repository import JobRepository
 from app.schemas.application import (
     ApplicationCreate,
     ApplicationResponse,
-    ApplicationWithCandidate,
+    ApplicationWithCandidateProfile,
     ApplicationWithJobAndCandidate,
     ApplicationWithJob,
 )
@@ -23,6 +25,8 @@ from app.schemas.dashboard import (
     HrDashboardResponse,
     JobStatusCounts,
 )
+from app.services.candidate_profile_service import CandidateProfileService
+from app.services.recommendation import score_job
 
 
 class ApplicationService:
@@ -30,9 +34,11 @@ class ApplicationService:
         self,
         application_repo: ApplicationRepository,
         job_repo: JobRepository,
+        profile_repo: CandidateProfileRepository,
     ) -> None:
         self.application_repo = application_repo
         self.job_repo = job_repo
+        self.profile_repo = profile_repo
 
     def apply(self, payload: ApplicationCreate, candidate: User) -> Application:
         job = self.job_repo.get_or_404(payload.job_id, resource_name="Job posting")
@@ -86,7 +92,7 @@ class ApplicationService:
         pagination: PaginationParams,
         *,
         status: Optional[ApplicationStatus] = None,
-    ) -> Page[ApplicationWithCandidate]:
+    ) -> Page[ApplicationWithCandidateProfile]:
         # Surface a 404 if the job itself doesn't exist (consistent error response).
         self.job_repo.get_or_404(job_id, resource_name="Job posting")
         items, total = self.application_repo.list_for_job(
@@ -95,8 +101,31 @@ class ApplicationService:
             offset=pagination.offset,
             status=status,
         )
-        return Page[ApplicationWithCandidate].build(
-            items=[ApplicationWithCandidate.model_validate(a) for a in items],
+        return Page[ApplicationWithCandidateProfile].build(
+            items=self._with_candidate_profiles(items),
+            total=total,
+            params=pagination,
+        )
+
+    def list_for_hr_jobs(
+        self,
+        hr: User,
+        pagination: PaginationParams,
+        *,
+        status: Optional[ApplicationStatus] = None,
+        job_id: Optional[int] = None,
+        search: Optional[str] = None,
+    ) -> Page[ApplicationWithCandidateProfile]:
+        items, total = self.application_repo.list_for_hr_jobs(
+            hr_user_id=hr.id,
+            limit=pagination.limit,
+            offset=pagination.offset,
+            status=status,
+            job_id=job_id,
+            search=search,
+        )
+        return Page[ApplicationWithCandidateProfile].build(
+            items=self._with_candidate_profiles(items),
             total=total,
             params=pagination,
         )
@@ -175,4 +204,52 @@ class ApplicationService:
             average_weekly_applications=round(total / len(buckets), 1),
             peak_week_label=peak_bucket.label,
             buckets=buckets,
+        )
+
+    def _with_candidate_profiles(
+        self, applications: list[Application]
+    ) -> list[ApplicationWithCandidateProfile]:
+        profiles = self.profile_repo.list_by_candidate_ids(
+            [application.candidate_id for application in applications]
+        )
+        return [
+            self._application_profile_response(
+                application,
+                profiles.get(application.candidate_id),
+            )
+            for application in applications
+        ]
+
+    def _application_profile_response(
+        self,
+        application: Application,
+        profile: CandidateProfile | None,
+    ) -> ApplicationWithCandidateProfile:
+        profile_response = (
+            CandidateProfileService._to_response(profile)
+            if profile is not None
+            else CandidateProfileService._default_response(application.candidate_id)
+        )
+        if profile is not None and CandidateProfileService._has_any_signal(profile):
+            match = score_job(
+                application.job,
+                profile=profile,
+                profile_skills=profile.skills,
+                preferred_roles=profile.preferred_roles,
+                application_status=application.status,
+            )
+            match_score = match.match_score
+            matched_skills = match.matched_skills
+            match_reason = match.reason
+        else:
+            match_score = 0
+            matched_skills = []
+            match_reason = "Candidate profile is incomplete"
+
+        return ApplicationWithCandidateProfile(
+            **ApplicationWithJobAndCandidate.model_validate(application).model_dump(),
+            candidate_profile=profile_response,
+            match_score=match_score,
+            matched_skills=matched_skills,
+            match_reason=match_reason,
         )
