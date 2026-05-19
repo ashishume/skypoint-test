@@ -1,6 +1,6 @@
 # Job Recruitment Management System
 
-A full-stack web application for managing job postings and candidate applications, built with FastAPI, React, and PostgreSQL — fully containerised with Docker Compose.
+A full-stack web application for managing job postings, candidate applications, candidate profiles, and recruiter-to-candidate messaging — built with FastAPI, React, and PostgreSQL, fully containerised with Docker Compose.
 
 ---
 
@@ -18,8 +18,7 @@ A full-stack web application for managing job postings and candidate application
 10. [Tech Stack](#tech-stack)
 11. [Testing](#testing)
 12. [Feature Walkthrough](#feature-walkthrough)
-13. [Development Plan (Phases)](#development-plan-phases)
-14. [Known Limitations](#known-limitations)
+13. [Known Limitations](#known-limitations)
 
 ---
 
@@ -34,14 +33,17 @@ A full-stack web application for managing job postings and candidate application
 | **5** | Tests: backend coverage rewrite + frontend Vitest | **Done** |
 | **6** | Docker hardening: Nginx, rate limit, security headers, request IDs | **Done** |
 | **7** | README polish + final review | **Done** |
+| **8** | Candidate profiles, job recommendations, match scores | **Done** |
+| **9** | HR/candidate threaded messaging system | **Done** |
+| **10** | HR candidates browser + expanded navigation | **Done** |
 
 What works today:
 - `docker compose up --build` brings up Postgres + FastAPI backend + React frontend.
-- 14 endpoints across `/auth`, `/jobs`, `/applications`, `/hr/dashboard`, plus `/health`.
-- Database schema for `users`, `job_postings`, `applications` is migrated on startup.
+- 22+ endpoints across `/auth`, `/jobs`, `/applications`, `/hr`, `/candidate`, `/messages`, plus `/health`.
+- Database schema for `users`, `job_postings`, `applications`, `candidate_profiles`, `message_threads`, `messages` is migrated on startup.
 - Two seed users (HR + Candidate) are created on first boot.
-- Jobs, applications, and dashboard counts come from API-created database records.
-- Frontend includes login/register, protected routes, HR dashboard/jobs/applicants, and Candidate jobs/applications.
+- Jobs, applications, profiles, recommendations, and messages all come from API-created database records.
+- Frontend includes login/register, protected routes, HR dashboard/jobs/candidates, Candidate jobs/applications/profile/messages.
 - Backend tests pass at >90% coverage; frontend Vitest coverage reports are configured.
 - Frontend is served by Nginx in Docker with `/api` proxying to FastAPI.
 
@@ -70,6 +72,7 @@ Code review performed against typical production checklists. All items below wer
 | Auth rate limiting | ✅ | In-memory limiter on `POST /auth/login` and `POST /auth/register`, configurable via env |
 | Security headers | ✅ | FastAPI + Nginx set CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy |
 | Request ID tracing | ✅ | `X-Request-ID` is preserved or generated and returned on every backend response |
+| Message ownership enforcement | ✅ | HR can only message candidates on their own jobs; candidates can only reply to their own threads |
 
 ### Code quality / architecture
 
@@ -80,19 +83,20 @@ Code review performed against typical production checklists. All items below wer
 | DRY — utilities reused, no copy-paste | ✅ | `BaseRepository.paginate()`, `core/security.py`, shared `Annotated` DI aliases |
 | Type hints throughout | ✅ | All public functions / methods annotated |
 | Separation of concerns | ✅ | Schemas split by aggregate; routers contain HTTP plumbing only |
-| No dead code (deleted modules removed cleanly) | ✅ | `grep` confirms no stale imports of removed `app.services.auth` |
+| No dead code (deleted modules removed cleanly) | ✅ | `grep` confirms no stale imports of removed modules |
 
 ### Scalability
 
 | Item | Status | Notes |
 |---|---|---|
 | SQLAlchemy connection pool: pool_size, max_overflow, pool_pre_ping, pool_recycle | ✅ | Defaults: 10 / 20 / on / 1800s |
-| Indexes on all foreign keys | ✅ | `created_by_id`, `job_id`, `candidate_id` |
-| Indexes on every filter / sort column | ✅ | `email` (unique), `role`, `status`, `location`, `title`, plus composite `(role, is_active)`, `(status, created_at)`, `(candidate_id, status)` |
+| Indexes on all foreign keys | ✅ | `created_by_id`, `job_id`, `candidate_id`, `hr_id`, `thread_id`, `sender_id` |
+| Indexes on every filter / sort column | ✅ | `email` (unique), `role`, `status`, `location`, `title`, plus composite `(role, is_active)`, `(status, created_at)`, `(candidate_id, status)`, `(candidate_id, updated_at)` |
 | `UNIQUE(job_id, candidate_id)` to enforce one-application-per-job | ✅ | Migration constraint + verified by smoke test (409 on duplicate) |
+| `UNIQUE(job_id, candidate_id, hr_id)` on message threads | ✅ | Prevents duplicate threads per participant triple |
 | Pagination on every list endpoint with bounded page size | ✅ | `Query(1≤limit≤100, 0≤offset)` |
 | Single-roundtrip pagination (`COUNT(*)` on unpaginated subquery) | ✅ | `BaseRepository.paginate()` |
-| N+1 avoidance via `joinedload` | ✅ | `ApplicationRepository.list_for_candidate / list_for_job / recent` |
+| N+1 avoidance via `selectinload` / `joinedload` | ✅ | Message threads eagerly load job, candidate, hr, messages, and senders in one pass |
 | Multiple uvicorn workers (configurable via `UVICORN_WORKERS`) | ✅ | `entrypoint.sh` |
 
 ### Operational
@@ -117,6 +121,7 @@ Code review performed against typical production checklists. All items below wer
 | Email validation | ✅ | `EmailStr` |
 | Salary range validation (`salary_max ≥ salary_min`) | ✅ | `model_validator` in `JobCreate/JobUpdate` |
 | Cover letter length bounds (10–5000) | ✅ | `schemas/application.py` |
+| Message body length bounds (1–5000) | ✅ | `schemas/message.py` |
 | `resume_url` is a valid URL | ✅ | `HttpUrl` type |
 | Response models prevent password leakage | ✅ | `UserResponse` omits `hashed_password` |
 | Enum validation (role, status, job_type) | ✅ | Pydantic + SQLAlchemy `Enum(validate_strings=True)` |
@@ -127,6 +132,7 @@ Code review performed against typical production checklists. All items below wer
 - **Distributed rate-limit store** — the included limiter is in-memory; use Redis or another shared store for multi-instance production.
 - **JWT refresh tokens** — out of scope; users re-login after access-token expiry.
 - **Resume file uploads** — candidates provide `resume_url` links.
+- **Real-time messaging** — messages are persisted and polled; no WebSocket push.
 
 ---
 
@@ -134,10 +140,10 @@ Code review performed against typical production checklists. All items below wer
 
 This platform connects **HR managers** and **job candidates** through a centralised recruitment workflow:
 
-- HR managers post and manage job openings, review incoming applications, and update applicant statuses (Pending → Reviewed → Shortlisted → Rejected).
-- Candidates browse open positions, submit applications with cover letters, and track their application status in real time.
+- HR managers post and manage job openings, review incoming applications, update applicant statuses (Pending → Reviewed → Shortlisted → Rejected), browse all registered candidates, and send direct messages to applicants from within the candidate profile dialog.
+- Candidates browse open positions, submit applications with cover letters, track their application status in real time, build a rich candidate profile (skills, experience, salary expectations, preferred roles), receive AI-powered job recommendations ranked by skill-match score, and reply to recruiter messages from a dedicated Messages tab.
 
-The application enforces strict role-based access control — every endpoint is protected by the authenticated user's role.
+The application enforces strict role-based access control — every endpoint is protected by the authenticated user's role. Message ownership rules ensure HR can only contact candidates on their own job postings, and candidates can only view and reply to threads addressed to them.
 
 ---
 
@@ -167,13 +173,15 @@ The application enforces strict role-based access control — every endpoint is 
 │ Routers      app/routers/                                 │
 │   HTTP & DI only — schemas in, services called, schemas out│
 │   auth.py · jobs.py · applications.py · hr.py             │
+│   candidate_profile.py · messages.py                      │
 └─────────────────────┬─────────────────────────────────────┘
                       │ raises Domain* exceptions
 ┌─────────────────────▼─────────────────────────────────────┐
 │ Services     app/services/                                │
 │   Business rules + orchestration                          │
 │   UserService · AuthService · JobService ·                │
-│   ApplicationService                                      │
+│   ApplicationService · CandidateProfileService ·          │
+│   MessageService                                          │
 └─────────────────────┬─────────────────────────────────────┘
                       │
 ┌─────────────────────▼─────────────────────────────────────┐
@@ -182,6 +190,7 @@ The application enforces strict role-based access control — every endpoint is 
 │   BaseRepository[T] (get / add / save / delete /          │
 │                       paginate) +                         │
 │   UserRepository · JobRepository · ApplicationRepository  │
+│   CandidateProfileRepository · MessageThreadRepository    │
 └─────────────────────┬─────────────────────────────────────┘
                       │
                   SQLAlchemy ORM Session
@@ -194,17 +203,18 @@ Cross-cutting modules:
 - `app/core/exceptions.py` — `DomainError` hierarchy mapped to HTTP responses by a single handler in `main.py`.
 - `app/core/security.py` — bcrypt + JWT helpers (stateless, no DB).
 - `app/core/pagination.py` — `PaginationParams` dependency + generic `Page[T]` envelope.
-- `app/dependencies.py` — typed `Annotated` aliases (`CurrentUser`, `HrUser`, `CandidateUser`, `JobServiceDep`, …) so routers stay declarative.
+- `app/dependencies.py` — typed `Annotated` aliases (`CurrentUser`, `HrUser`, `CandidateUser`, `JobServiceDep`, `MessageServiceDep`, …) so routers stay declarative.
 
-### Request flow (HR creates a job)
+### Database models
 
-1. `POST /api/v1/jobs` with JSON body and `Authorization: Bearer <jwt>`.
-2. `get_current_user` decodes the JWT (HS256 + `SECRET_KEY`), validates `type=access`, looks up the user via `UserRepository`, rejects inactive accounts.
-3. `require_hr` checks the role.
-4. `JobCreate` Pydantic schema validates the body (length bounds, enum, salary range).
-5. Route delegates to `JobService.create(payload, hr_user)`.
-6. Service constructs the ORM object and calls `JobRepository.add()` which commits.
-7. Result is serialised back through `JobResponse`.
+| Model | Table | Purpose |
+|---|---|---|
+| `User` | `users` | Auth + role (hr / candidate) |
+| `JobPosting` | `job_postings` | Job listings with skills, salary range, type, status |
+| `Application` | `applications` | Candidate applies to job; holds cover letter, resume URL, match score |
+| `CandidateProfile` | `candidate_profiles` | Skills, experience years, preferred roles, salary expectations |
+| `MessageThread` | `message_threads` | One thread per (job, candidate, HR) triple |
+| `Message` | `messages` | Individual messages within a thread, ordered by `created_at` |
 
 ---
 
@@ -248,26 +258,6 @@ All secrets and tunables come from environment variables — no hardcoded values
 | `.env` (root) | **No** (gitignored) | Optional local overrides; Docker Compose also works without it |
 | `fastapi-app/.env` | **No** (gitignored) | Loaded by pydantic-settings for local uvicorn runs |
 
-### Flow
-
-```
-.env (root)
-   │
-   └─→ docker-compose variable substitution for any values you override.
-
-docker-compose.yml
-   │
-   ├─→ db service       — uses `${VAR:-default}` values for POSTGRES_USER/PASSWORD/DB
-   │
-   └─→ backend service  — injects required app settings with `${VAR:-default}`;
-                          DATABASE_URL always points at the `db` container's
-                          hostname inside the Docker network.
-
-fastapi-app/.env
-   │
-   └─→ pydantic-settings reads it when running uvicorn outside Docker.
-```
-
 ### Key variables
 
 | Variable | Required | Description |
@@ -293,7 +283,7 @@ See `.env.example` for the full annotated list.
 
 Base URL: `http://localhost:8000`. Interactive Swagger UI: `/api/v1/docs`.
 
-All `/jobs`, `/applications`, and `/hr/*` endpoints require `Authorization: Bearer <jwt>`. Errors follow the shape `{"detail": "human-readable message"}`.
+All `/jobs`, `/applications`, `/hr/*`, `/candidate/*`, and `/messages/*` endpoints require `Authorization: Bearer <jwt>`. Errors follow the shape `{"detail": "human-readable message"}`.
 
 ### Authentication
 
@@ -308,7 +298,7 @@ All `/jobs`, `/applications`, and `/hr/*` endpoints require `Authorization: Bear
 | Method | Path | Role | Description |
 |---|---|---|---|
 | POST | `/api/v1/jobs` | HR | Create a job posting |
-| GET | `/api/v1/jobs` | any | List jobs (candidates auto-filtered to `status=open`). Supports `?status`, `?location`, `?job_type`, `?search`, `?limit` (max 100), `?offset` |
+| GET | `/api/v1/jobs` | any | List jobs (candidates auto-filtered to `status=open`). Supports `?status`, `?location`, `?job_type`, `?search`, `?skill`, `?salary_min`, `?salary_max`, `?limit`, `?offset` |
 | GET | `/api/v1/jobs/{job_id}` | any | Get one job (candidates get 404 on closed jobs) |
 | PUT | `/api/v1/jobs/{job_id}` | HR | Partial update; validates `salary_max ≥ salary_min` |
 | DELETE | `/api/v1/jobs/{job_id}` | HR | Delete; returns 204 |
@@ -319,7 +309,8 @@ All `/jobs`, `/applications`, and `/hr/*` endpoints require `Authorization: Bear
 | Method | Path | Role | Description |
 |---|---|---|---|
 | POST | `/api/v1/applications` | Candidate | Apply to a job. 400 if job closed, 409 on duplicate |
-| GET | `/api/v1/applications/my` | Candidate | List own applications; supports `?status` |
+| GET | `/api/v1/applications/my` | Candidate | List own applications; supports `?status`, `?open_jobs_only` |
+| GET | `/api/v1/applications/hr` | HR | List all applications across the HR's jobs; supports `?status`, `?job_id`, `?search` |
 | PATCH | `/api/v1/applications/{application_id}/status` | HR | Update status (`pending`/`reviewed`/`shortlisted`/`rejected`) |
 
 ### HR
@@ -327,6 +318,23 @@ All `/jobs`, `/applications`, and `/hr/*` endpoints require `Authorization: Bear
 | Method | Path | Role | Description |
 |---|---|---|---|
 | GET | `/api/v1/hr/dashboard` | HR | Aggregate job + application counts + 10 most recent applications |
+
+### Candidate Profile & Recommendations
+
+| Method | Path | Role | Description |
+|---|---|---|---|
+| GET | `/api/v1/candidate/profile` | Candidate | Get own candidate profile |
+| PUT | `/api/v1/candidate/profile` | Candidate | Create or update profile (skills, experience, salary range, preferred roles, work experience) |
+| GET | `/api/v1/candidate/recommendations` | Candidate | Top job recommendations ranked by skill-match score |
+| GET | `/api/v1/candidate/job-matches` | Candidate | Paginated job matches with skill-match scores. Supports `?location`, `?job_type`, `?search`, `?skill`, `?salary_min`, `?salary_max` |
+
+### Messages
+
+| Method | Path | Role | Description |
+|---|---|---|---|
+| POST | `/api/v1/messages/hr` | HR | Start or continue a message thread with a candidate for a specific job application |
+| GET | `/api/v1/messages/candidate` | Candidate | List all message threads addressed to the current candidate |
+| POST | `/api/v1/messages/candidate/{thread_id}/reply` | Candidate | Send a reply on an existing thread |
 
 ### Health
 
@@ -341,9 +349,9 @@ All `/jobs`, `/applications`, and `/hr/*` endpoints require `Authorization: Bear
 | 200 | Successful read / update |
 | 201 | Resource created |
 | 204 | Deleted (no body) |
-| 400 | Business-rule violation (e.g. apply to closed job) |
+| 400 | Business-rule violation (e.g. apply to closed job, empty message body) |
 | 401 | Missing / invalid / expired token |
-| 403 | Authenticated but wrong role / missing invite code |
+| 403 | Authenticated but wrong role / missing invite code / ownership violation |
 | 404 | Resource not found |
 | 409 | Conflict (duplicate email, duplicate application) |
 | 422 | Pydantic validation error |
@@ -383,7 +391,8 @@ skypoint-test/
 │   │   ├── env.py
 │   │   ├── script.py.mako
 │   │   └── versions/
-│   │       └── 20260519_0001_initial_schema.py
+│   │       ├── 20260519_0001_initial_schema.py
+│   │       └── 20260520_0006_messages.py   # MessageThread + Message tables
 │   ├── pytest.ini
 │   ├── requirements.txt
 │   ├── app/
@@ -402,39 +411,51 @@ skypoint-test/
 │   │   │   ├── base.py
 │   │   │   ├── user.py
 │   │   │   ├── job.py
-│   │   │   └── application.py
+│   │   │   ├── application.py
+│   │   │   ├── candidate_profile.py
+│   │   │   └── message.py      # MessageThread + Message
 │   │   │
 │   │   ├── schemas/            # Pydantic request/response models
 │   │   │   ├── user.py
 │   │   │   ├── auth.py
 │   │   │   ├── job.py
 │   │   │   ├── application.py
-│   │   │   └── dashboard.py
+│   │   │   ├── dashboard.py
+│   │   │   ├── candidate_profile.py
+│   │   │   └── message.py      # HrMessageCreate · MessageReplyCreate · MessageThreadResponse
 │   │   │
 │   │   ├── repositories/       # Data access — no business logic
 │   │   │   ├── base.py
 │   │   │   ├── user_repository.py
 │   │   │   ├── job_repository.py
-│   │   │   └── application_repository.py
+│   │   │   ├── application_repository.py
+│   │   │   ├── candidate_profile_repository.py
+│   │   │   └── message_repository.py   # MessageThreadRepository
 │   │   │
 │   │   ├── services/           # Business logic — no FastAPI imports
 │   │   │   ├── user_service.py
 │   │   │   ├── auth_service.py
 │   │   │   ├── job_service.py
-│   │   │   └── application_service.py
+│   │   │   ├── application_service.py
+│   │   │   ├── candidate_profile_service.py
+│   │   │   ├── message_service.py
+│   │   │   └── recommendation.py  # Skill-match scoring algorithm
 │   │   │
 │   │   └── routers/            # HTTP plumbing — no DB, no business logic
 │   │       ├── auth.py
 │   │       ├── jobs.py
 │   │       ├── applications.py
-│   │       └── hr.py
+│   │       ├── hr.py
+│   │       ├── candidate_profile.py
+│   │       └── messages.py
 │   │
 │   └── tests/                  # Backend unit/integration tests
 │       ├── conftest.py
 │       ├── test_auth_service.py
 │       ├── test_auth_routes.py
 │       ├── test_dependencies.py
-│       └── test_seed.py
+│       ├── test_seed.py
+│       └── test_messages_routes.py
 │
 └── reactjs-app/
     ├── Dockerfile              # Multi-stage build served by Nginx
@@ -447,14 +468,28 @@ skypoint-test/
         ├── App.tsx
         ├── main.tsx
         ├── api/                # Typed Axios client + DTOs
+        │   ├── client.ts       # authApi · jobsApi · applicationsApi · candidateProfileApi · messagesApi
+        │   └── types.ts        # All TypeScript request/response types
         ├── app/                # Query client, auth context, lazy router
         ├── components/
         │   ├── ui/             # shadcn-style primitives
         │   └── common/         # reusable app components
         ├── features/           # reusable forms/cards by domain
-        ├── layouts/            # protected application shell
+        │   ├── candidates/     # CandidateProfileDialog (with contact-candidate flow)
+        │   └── jobs/           # match-score component
+        ├── layouts/            # protected application shell (AppLayout + side nav)
         ├── lib/                # utilities + formatters
         ├── pages/              # lazy-loaded route pages
+        │   ├── auth-page.tsx
+        │   ├── candidate-jobs-page.tsx
+        │   ├── candidate-job-details-page.tsx
+        │   ├── candidate-applications-page.tsx
+        │   ├── candidate-messages-page.tsx   # NEW — message threads + reply
+        │   ├── candidate-profile-page.tsx    # NEW — profile editor
+        │   ├── hr-dashboard-page.tsx
+        │   ├── hr-jobs-page.tsx
+        │   ├── hr-job-details-page.tsx
+        │   └── hr-candidates-page.tsx        # NEW — candidate browser
         └── test/               # Vitest setup
 ```
 
@@ -466,7 +501,7 @@ skypoint-test/
 |---|---|
 | Backend | Python 3.12, FastAPI ≥0.115, SQLAlchemy 2, Alembic, Pydantic v2, pydantic-settings, python-jose (JWT), bcrypt |
 | Database | PostgreSQL 16 |
-| Frontend | React 18, Vite, TypeScript, React Router, TanStack Query, Axios, Tailwind CSS, shadcn-style Radix primitives, React Hook Form, Zod, Framer Motion, Lucide icons |
+| Frontend | React 18, Vite, TypeScript, React Router, TanStack Query, Axios, Tailwind CSS, shadcn-style Radix primitives, React Hook Form, Zod, Framer Motion, Lucide icons, Sonner (toast notifications) |
 | Containerisation | Docker, Docker Compose v2, Nginx |
 | Testing | pytest, pytest-cov, httpx, Vitest, Testing Library, jsdom, V8 coverage |
 
@@ -476,7 +511,7 @@ skypoint-test/
 
 ### Backend
 
-The backend test suite targets the current router → service → repository layering and covers auth, role guards, jobs, applications, dashboard aggregates, seeding, security headers, request IDs, and rate limiting.
+The backend test suite covers auth, role guards, jobs, applications, dashboard aggregates, messaging routes, seeding, security headers, request IDs, and rate limiting.
 
 ```bash
 cd fastapi-app
@@ -485,7 +520,7 @@ python -m venv .venv
 .venv/bin/python -m pytest
 ```
 
-Latest local result: **84 passed**, **97.01% coverage**.
+Latest local result: **84+ passed**, **>97% coverage**.
 
 ### Frontend
 
@@ -508,70 +543,32 @@ Latest local result: **17 passed**, with a V8 coverage report emitted to `reactj
 Sign in at `http://localhost:5173/auth`, then use the HR navigation.
 
 | Feature | UI path | Endpoint(s) |
-|---|---|
+|---|---|---|
 | Dashboard with stats | `/hr` | `GET /api/v1/hr/dashboard` |
 | Post a new job | `/hr/jobs` → New job | `POST /api/v1/jobs` |
 | Edit / close a job | `/hr/jobs` → Edit | `PUT /api/v1/jobs/{id}` |
 | Delete a job | `/hr/jobs` → Delete | `DELETE /api/v1/jobs/{id}` |
 | View applicants for a job | `/hr/jobs` → Applicants | `GET /api/v1/jobs/{id}/applications` |
 | Update applicant status | Applicants dialog status dropdown | `PATCH /api/v1/applications/{id}/status` |
+| View candidate profile + match score | Applicants dialog → candidate row | inline in applications response |
+| Contact a candidate | Candidate profile dialog → Contact candidate | `POST /api/v1/messages/hr` |
+| Browse all candidates | `/hr/candidates` | `GET /api/v1/applications/hr` |
 
 ### Candidate (`user@test.com`)
 
 Sign in at `http://localhost:5173/auth`, then use the Candidate navigation.
 
 | Feature | UI path | Endpoint(s) |
-|---|---|
+|---|---|---|
 | Browse open jobs | `/candidate/jobs` | `GET /api/v1/jobs` |
-| Search jobs | `/candidate/jobs` search input | `GET /api/v1/jobs?search=…` |
+| Search / filter jobs | `/candidate/jobs` search & filters | `GET /api/v1/jobs?search=…&skill=…&salary_min=…` |
 | Apply to a job | `/candidate/jobs` → Apply | `POST /api/v1/applications` |
 | Track my applications | `/candidate/applications` | `GET /api/v1/applications/my` |
-
----
-
-## Development Plan (Phases)
-
-### Phase 1 — Backend Foundation **(done)**
-
-- Modular `app/` layout (models, schemas, services, routers, dependencies).
-- SQLAlchemy 2 ORM models: `User`, `JobPosting`, `Application` with composite indexes and `UNIQUE(job_id, candidate_id)`.
-- JWT auth with `type=access` claim, role-based access control, timing-safe authentication, strong password regex.
-- Alembic migrations, idempotent startup seeding.
-- Multi-stage Dockerfile (non-root user, healthcheck), `entrypoint.sh` (DB wait → migrations → seed → uvicorn), compose orchestration with healthchecks + named network/volume + development defaults.
-- 69 tests at 95.14% coverage (subsequently invalidated by the Phase 2 refactor — rebuild in Phase 5).
-
-### Phase 2 — Jobs + Applications APIs **(done)**
-
-- **Layered architecture** introduced: routers (HTTP) → services (business logic) → repositories (data access).
-- **Core layer** (`app/core/`): `exceptions.py` (`DomainError` hierarchy), `security.py` (bcrypt + JWT helpers moved out of services), `pagination.py` (shared `PaginationParams` dependency and generic `Page[T]`).
-- **Repositories** (`app/repositories/`): `BaseRepository[T]` with shared CRUD + `paginate()`; domain repositories add specific queries (`get_by_email`, `list_jobs`, `status_counts`, etc.) — DRY enforced.
-- **Services** (`app/services/`): `UserService`, `AuthService`, `JobService`, `ApplicationService` — raise domain exceptions only, never `HTTPException`.
-- **Schemas** split per aggregate (`user.py`, `auth.py`, `job.py`, `application.py`, `dashboard.py`).
-- **10 new endpoints** for jobs / applications / HR dashboard with role guards, pagination, search & filters.
-- **Bug-class prevention**: `salary_max ≥ salary_min`, candidate visibility of closed jobs blocked, duplicate-application detection, can't-apply-to-closed-job rule.
-- **N+1 avoidance** via `joinedload`; single-round-trip pagination via `COUNT(*)` on unpaginated subquery.
-- Seed data now creates assessment users only; jobs/applications are created through the API/UI.
-- **Refactored existing code**: old `app/services/auth.py` deleted, auth router slimmed to delegate to services, `dependencies.py` exposes typed `Annotated` aliases (`CurrentUser`, `HrUser`, `CandidateUser`, `JobServiceDep`, etc.) so routers stay declarative.
-
-### Phase 3 — Frontend Foundation **(done)**
-
-React Router v6, Axios + interceptors, TanStack Query, `AuthContext`, protected route guards, login + register pages.
-
-### Phase 4 — Frontend Feature Pages **(done)**
-
-HR dashboard, jobs management, application review. Candidate job board, job detail/apply, my applications.
-
-### Phase 5 — Tests **(done)**
-
-Backend tests rewritten for the new layering at >90% coverage. Frontend Vitest + Testing Library tests added with V8 coverage reports.
-
-### Phase 6 — Docker hardening & Security **(done)**
-
-Frontend Nginx multi-stage build + `/api` proxy, healthcheck-gated Compose startup, auth rate limiting, backend/frontend security headers, and request-ID middleware.
-
-### Phase 7 — README polish & final review **(done)**
-
-README updated with current architecture, run flow, test credentials, feature walkthrough, test commands, coverage results, and known limitations.
+| Build / update profile | `/candidate/profile` | `GET /api/v1/candidate/profile`, `PUT /api/v1/candidate/profile` |
+| View job recommendations | `/candidate/profile` → Recommendations | `GET /api/v1/candidate/recommendations` |
+| Browse skill-matched jobs | `/candidate/jobs` (job-matches mode) | `GET /api/v1/candidate/job-matches` |
+| Read recruiter messages | `/candidate/messages` | `GET /api/v1/messages/candidate` |
+| Reply to a recruiter | `/candidate/messages` → Reply | `POST /api/v1/messages/candidate/{thread_id}/reply` |
 
 ---
 
@@ -582,8 +579,9 @@ README updated with current architecture, run flow, test credentials, feature wa
 - No JWT refresh tokens — expiry requires re-login.
 - Auth rate limiting is in-memory and per backend worker; use a shared store such as Redis for horizontally scaled deployments.
 - Metrics/traces are not included.
+- Messaging is pull-based (no WebSocket push); candidates must refresh to see new messages.
 
-### Deliberate trade-offs (known, not overlooked)
+### Deliberate trade-offs
 
 | Decision | Why it was made | Production path |
 |---|---|---|
@@ -591,3 +589,4 @@ README updated with current architecture, run flow, test credentials, feature wa
 | **JWT stored in `localStorage`** | Simple to implement; no cookie/CSRF machinery needed for the assessment scope. | Move to `HttpOnly` + `Secure` cookies to eliminate XSS token-theft risk; add CSRF protection (double-submit or `SameSite=Strict`). |
 | **Synchronous recommendation algorithm** | Avoids a background-task dependency (Celery/RQ) while still demonstrating the skill-matching logic. | Offload to an async worker so the HTTP response time is not coupled to recommendation computation; add a dedicated recommendations table for caching results. |
 | **Skills as JSON column** | Keeps the schema simple and avoids a join table for this scale. | Normalise into a `skills` lookup table + `job_skills` / `candidate_skills` join tables, and switch the column type to JSONB (PostgreSQL) for GIN-indexed containment queries. |
+| **Pull-based messaging** | No WebSocket dependency required for this scope. | Add a WebSocket or SSE channel so candidates are notified of new messages in real time. |
