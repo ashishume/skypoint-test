@@ -1,36 +1,60 @@
 services:
   db:
     image: postgres:16-alpine
+    container_name: jobapp_db
+    env_file:
+      - .env
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: appdb
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-appdb}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-appdb}"]
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - jobapp_net
 
   backend:
     build:
       context: ./fastapi-app
-    ports:
-      - "8000:8000"
+    container_name: jobapp_backend
+    env_file:
+      - .env
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/appdb
+      # Override DATABASE_URL so the backend always points at the `db` service
+      # inside the Docker network, regardless of what's in .env.
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-appdb}
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
     depends_on:
       db:
         condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - jobapp_net
 
   frontend:
     build:
       context: ./reactjs-app
+    container_name: jobapp_frontend
     ports:
-      - "5173:5173"
+      - "${FRONTEND_PORT:-5173}:5173"
     depends_on:
       - backend
+    restart: unless-stopped
+    networks:
+      - jobapp_net
 
 volumes:
   postgres_data:
+    name: jobapp_postgres_data
+
+networks:
+  jobapp_net:
+    driver: bridge

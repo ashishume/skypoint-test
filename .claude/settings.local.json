@@ -5,7 +5,16 @@
       "Bash(python3 -m venv venv)",
       "Bash(pip install *)",
       "Bash(npm create *)",
-      "Bash(npm install *)"
+      "Bash(npm install *)",
+      "Bash(chmod +x /Users/ashish-mac/Downloads/Github/skypoint-test/fastapi-app/entrypoint.sh)",
+      "Bash(python3 -m venv .venv)",
+      "Bash(.venv/bin/pip install *)",
+      "Read(//opt/homebrew/bin/**)",
+      "Read(//usr/local/bin/**)",
+      "Read(//opt/homebrew/Cellar/**)",
+      "Bash(.venv/bin/python -m pytest)",
+      "Bash(.venv/bin/python *)",
+      "Bash(/Users/ashish-mac/Downloads/Github/skypoint-test/fastapi-app/.venv/bin/python *)"
     ]
   }
 }
