@@ -17,7 +17,7 @@ A full-stack web application for managing job postings and candidate application
 9. [Project Structure](#project-structure)
 10. [Tech Stack](#tech-stack)
 11. [Testing](#testing)
-12. [Feature Walkthrough (planned)](#feature-walkthrough-planned)
+12. [Feature Walkthrough](#feature-walkthrough)
 13. [Development Plan (Phases)](#development-plan-phases)
 14. [Known Limitations](#known-limitations)
 
@@ -29,18 +29,19 @@ A full-stack web application for managing job postings and candidate application
 |---|---|---|
 | **1** | Backend foundation: schema, JWT auth, register/login/me, seed, Docker | **Done** |
 | **2** | Backend feature APIs: jobs CRUD, applications, HR dashboard, repository/service/router layering | **Done** |
-| 3 | Frontend: shell, routing, auth state | Pending |
-| 4 | Frontend: HR + Candidate feature pages | Pending |
+| **3** | Frontend: shell, routing, auth state, lazy-loaded routes | **Done** |
+| **4** | Frontend: HR + Candidate feature pages | **Done** |
 | 5 | Tests: rewrite for Phase 2 layering, add frontend Vitest | Pending (existing 69 backend tests need import updates after the refactor) |
 | 6 | Docker hardening (Nginx, rate limit, security headers) | Pending |
 | 7 | README polish + final review | In progress |
 
 What works today:
-- `docker compose up --build` brings up Postgres + FastAPI backend.
+- `docker compose up --build` brings up Postgres + FastAPI backend + React frontend.
 - 14 endpoints across `/auth`, `/jobs`, `/applications`, `/hr/dashboard`, plus `/health`.
 - Database schema for `users`, `job_postings`, `applications` is migrated on startup.
-- Two seed users (HR + Candidate) and 5 sample jobs created on first boot.
-- Frontend is still the original placeholder UI — it does not yet talk to the backend.
+- Two seed users (HR + Candidate) are created on first boot.
+- Jobs, applications, and dashboard counts come from API-created database records.
+- Frontend includes login/register, protected routes, HR dashboard/jobs/applicants, and Candidate jobs/applications.
 
 ---
 
@@ -94,14 +95,14 @@ Code review performed against typical production checklists. All items below wer
 | Item | Status | Notes |
 |---|---|---|
 | Single-command startup | ✅ | `docker compose up --build` |
-| Database migrations via Alembic | ✅ | Auto-run by `entrypoint.sh` before serving traffic |
-| Idempotent seed (HR + Candidate + 5 sample jobs) | ✅ | Skips on re-run |
+| Database readiness wait + migrations via Alembic | ✅ | `entrypoint.sh` waits for Postgres, then runs `alembic upgrade head` before serving traffic |
+| Idempotent seed (HR + Candidate users only) | ✅ | `entrypoint.sh` runs `python -m app.seed`; skips existing users on re-run |
 | Healthcheck endpoint + Docker `HEALTHCHECK` | ✅ | `GET /health`, `curl`-based |
 | Structured logging | ✅ | Module-level loggers; lifespan + DB errors logged |
 | Graceful shutdown disposes engine | ✅ | `lifespan` finally block |
 | Postgres healthcheck blocks backend until DB ready | ✅ | `depends_on: condition: service_healthy` |
 | Persistent DB volume | ✅ | Named volume `jobapp_postgres_data` |
-| Env config externalised; `.env` gitignored; `.env.example` template provided | ✅ | Both root and `fastapi-app/` |
+| Env config externalised; `.env` gitignored; `.env.example` template provided | ✅ | Compose has development defaults; `.env` is only needed for overrides |
 
 ### Validation (input / output)
 
@@ -123,7 +124,7 @@ Code review performed against typical production checklists. All items below wer
 - **Observability** (metrics, traces) — out of scope for this assessment.
 - **JWT refresh tokens** — out of scope; users re-login after 30 min.
 - **Backend tests rewrite** after Phase 2 refactor — Phase 5. The original 69 tests covered the pre-refactor module paths and will need updating.
-- **Frontend integration** — Phases 3 & 4.
+- **Frontend production serving via Nginx** — planned for Phase 6; current Docker frontend runs the Vite server for assessment/dev.
 
 ---
 
@@ -219,9 +220,16 @@ cd skypoint-test
 docker compose up --build
 ```
 
-The backend will be available at **http://localhost:8000** (Swagger UI at **http://localhost:8000/api/v1/docs**). On first boot the backend runs Alembic migrations and seeds the two test users plus 5 sample jobs.
+The frontend will be available at **http://localhost:5173**. The backend will be available at **http://localhost:8000** (Swagger UI at **http://localhost:8000/api/v1/docs**).
 
-No additional configuration is required — `docker-compose.yml` has development defaults baked in via `${VAR:-default}` substitution and `env_file: .env` is optional. Create a `.env` to override anything (see next section).
+No additional configuration is required. `docker-compose.yml` includes development defaults, and the backend startup script automatically:
+
+1. Waits for PostgreSQL to accept connections.
+2. Runs `alembic upgrade head` to create/update the database tables.
+3. Runs `python -m app.seed` to create the assessment HR and Candidate users.
+4. Starts Uvicorn.
+
+Create a root `.env` only if you want to override the documented defaults.
 
 ---
 
@@ -235,7 +243,7 @@ All secrets and tunables come from environment variables — no hardcoded values
 |---|---|---|
 | `.env.example` (root) | Yes | Template documenting every variable |
 | `fastapi-app/.env.example` | Yes | Backend-only template |
-| `.env` (root) | **No** (gitignored) | Local dev values; loaded by docker-compose |
+| `.env` (root) | **No** (gitignored) | Optional local overrides; Docker Compose also works without it |
 | `fastapi-app/.env` | **No** (gitignored) | Loaded by pydantic-settings for local uvicorn runs |
 
 ### Flow
@@ -243,13 +251,15 @@ All secrets and tunables come from environment variables — no hardcoded values
 ```
 .env (root)
    │
-   ├─→ docker-compose variable substitution
+   └─→ docker-compose variable substitution for any values you override.
+
+docker-compose.yml
    │
-   ├─→ db service       — env_file: .env injects POSTGRES_USER/PASSWORD/DB
+   ├─→ db service       — uses `${VAR:-default}` values for POSTGRES_USER/PASSWORD/DB
    │
-   └─→ backend service  — env_file: .env injects ALL vars into the container;
-                          DATABASE_URL is then overridden so it points at
-                          the `db` container's hostname inside the Docker network.
+   └─→ backend service  — injects required app settings with `${VAR:-default}`;
+                          DATABASE_URL always points at the `db` container's
+                          hostname inside the Docker network.
 
 fastapi-app/.env
    │
@@ -269,7 +279,7 @@ fastapi-app/.env
 | `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` / `DB_POOL_RECYCLE_SECONDS` / `DB_POOL_TIMEOUT_SECONDS` | no | Connection pool tuning |
 | `CORS_ORIGINS` | no | Comma-separated allowed frontend origins |
 | `UVICORN_WORKERS` | no (default `2`) | Number of uvicorn worker processes |
-| `SEED_DATA` | no (default `false`) | If `true`, auto-creates HR + Candidate + sample jobs on startup |
+| `SEED_DATA` | no (default `false`) | If `true`, auto-creates HR + Candidate users on startup |
 | `SEED_HR_EMAIL` / `SEED_HR_PASSWORD` / `SEED_CANDIDATE_EMAIL` / `SEED_CANDIDATE_PASSWORD` | only if `SEED_DATA=true` | Seed credentials |
 
 See `.env.example` for the full annotated list.
@@ -378,7 +388,7 @@ skypoint-test/
 │   │   ├── config.py           # pydantic-settings (env-driven, validated)
 │   │   ├── database.py         # SQLAlchemy engine + pool + get_db dep
 │   │   ├── dependencies.py     # DI factories + role guards + typed aliases
-│   │   ├── seed.py             # Idempotent users + sample jobs
+│   │   ├── seed.py             # Idempotent assessment users
 │   │   │
 │   │   ├── core/               # Cross-cutting concerns (no DB, no FastAPI)
 │   │   │   ├── exceptions.py   # DomainError hierarchy
@@ -423,7 +433,24 @@ skypoint-test/
 │       ├── test_dependencies.py
 │       └── test_seed.py
 │
-└── reactjs-app/                # Frontend (still placeholder — Phase 3/4)
+└── reactjs-app/
+    ├── Dockerfile              # Vite dev server container for assessment/dev
+    ├── package.json
+    ├── vite.config.ts          # /api proxy + lazy chunk strategy
+    ├── tailwind.config.js
+    ├── components.json         # shadcn-compatible component config
+    └── src/
+        ├── App.tsx
+        ├── main.tsx
+        ├── api/                # Typed Axios client + DTOs
+        ├── app/                # Query client, auth context, lazy router
+        ├── components/
+        │   ├── ui/             # shadcn-style primitives
+        │   └── common/         # reusable app components
+        ├── features/           # reusable forms/cards by domain
+        ├── layouts/            # protected application shell
+        ├── lib/                # utilities + formatters
+        └── pages/              # lazy-loaded route pages
 ```
 
 ---
@@ -434,7 +461,7 @@ skypoint-test/
 |---|---|
 | Backend | Python 3.12, FastAPI ≥0.115, SQLAlchemy 2, Alembic, Pydantic v2, pydantic-settings, python-jose (JWT), bcrypt |
 | Database | PostgreSQL 16 |
-| Frontend | React 18, Vite (still placeholder; React Router + TanStack Query + Tailwind planned for Phase 3) |
+| Frontend | React 18, Vite, TypeScript, React Router, TanStack Query, Axios, Tailwind CSS, shadcn-style Radix primitives, React Hook Form, Zod, Framer Motion, Lucide icons |
 | Containerisation | Docker, Docker Compose v2 |
 | Testing | pytest, pytest-cov, httpx (test suite under reconstruction post-refactor) |
 
@@ -462,30 +489,31 @@ python -m venv .venv
 
 ---
 
-## Feature Walkthrough (planned)
-
-> The endpoints below are already implemented (Phase 2). The UI pages that consume them are part of Phases 3–4.
+## Feature Walkthrough
 
 ### HR Manager (`admin@test.com`)
 
-| Feature | Endpoint(s) |
+Sign in at `http://localhost:5173/auth`, then use the HR navigation.
+
+| Feature | UI path | Endpoint(s) |
 |---|---|
-| Dashboard with stats | `GET /api/v1/hr/dashboard` |
-| Post a new job | `POST /api/v1/jobs` |
-| Edit / close a job | `PUT /api/v1/jobs/{id}` |
-| Delete a job | `DELETE /api/v1/jobs/{id}` |
-| View applicants for a job | `GET /api/v1/jobs/{id}/applications` |
-| Update applicant status | `PATCH /api/v1/applications/{id}/status` |
+| Dashboard with stats | `/hr` | `GET /api/v1/hr/dashboard` |
+| Post a new job | `/hr/jobs` → New job | `POST /api/v1/jobs` |
+| Edit / close a job | `/hr/jobs` → Edit | `PUT /api/v1/jobs/{id}` |
+| Delete a job | `/hr/jobs` → Delete | `DELETE /api/v1/jobs/{id}` |
+| View applicants for a job | `/hr/jobs` → Applicants | `GET /api/v1/jobs/{id}/applications` |
+| Update applicant status | Applicants dialog status dropdown | `PATCH /api/v1/applications/{id}/status` |
 
 ### Candidate (`user@test.com`)
 
-| Feature | Endpoint(s) |
+Sign in at `http://localhost:5173/auth`, then use the Candidate navigation.
+
+| Feature | UI path | Endpoint(s) |
 |---|---|
-| Browse open jobs | `GET /api/v1/jobs` |
-| Search / filter | `GET /api/v1/jobs?search=…&location=…&job_type=…` |
-| View job details | `GET /api/v1/jobs/{id}` |
-| Apply to a job | `POST /api/v1/applications` |
-| Track my applications | `GET /api/v1/applications/my` |
+| Browse open jobs | `/candidate/jobs` | `GET /api/v1/jobs` |
+| Search jobs | `/candidate/jobs` search input | `GET /api/v1/jobs?search=…` |
+| Apply to a job | `/candidate/jobs` → Apply | `POST /api/v1/applications` |
+| Track my applications | `/candidate/applications` | `GET /api/v1/applications/my` |
 
 ---
 
@@ -497,7 +525,7 @@ python -m venv .venv
 - SQLAlchemy 2 ORM models: `User`, `JobPosting`, `Application` with composite indexes and `UNIQUE(job_id, candidate_id)`.
 - JWT auth with `type=access` claim, role-based access control, timing-safe authentication, strong password regex.
 - Alembic migrations, idempotent startup seeding.
-- Multi-stage Dockerfile (non-root user, healthcheck), `entrypoint.sh` (migrations → uvicorn), compose orchestration with healthchecks + named network/volume + `env_file`.
+- Multi-stage Dockerfile (non-root user, healthcheck), `entrypoint.sh` (DB wait → migrations → seed → uvicorn), compose orchestration with healthchecks + named network/volume + development defaults.
 - 69 tests at 95.14% coverage (subsequently invalidated by the Phase 2 refactor — rebuild in Phase 5).
 
 ### Phase 2 — Jobs + Applications APIs **(done)**
@@ -510,14 +538,14 @@ python -m venv .venv
 - **10 new endpoints** for jobs / applications / HR dashboard with role guards, pagination, search & filters.
 - **Bug-class prevention**: `salary_max ≥ salary_min`, candidate visibility of closed jobs blocked, duplicate-application detection, can't-apply-to-closed-job rule.
 - **N+1 avoidance** via `joinedload`; single-round-trip pagination via `COUNT(*)` on unpaginated subquery.
-- **5 sample jobs** seeded alongside the HR + Candidate users.
+- Seed data now creates assessment users only; jobs/applications are created through the API/UI.
 - **Refactored existing code**: old `app/services/auth.py` deleted, auth router slimmed to delegate to services, `dependencies.py` exposes typed `Annotated` aliases (`CurrentUser`, `HrUser`, `CandidateUser`, `JobServiceDep`, etc.) so routers stay declarative.
 
-### Phase 3 — Frontend Foundation
+### Phase 3 — Frontend Foundation **(done)**
 
 React Router v6, Axios + interceptors, TanStack Query, `AuthContext`, protected route guards, login + register pages.
 
-### Phase 4 — Frontend Feature Pages
+### Phase 4 — Frontend Feature Pages **(done)**
 
 HR dashboard, jobs management, application review. Candidate job board, job detail/apply, my applications.
 
@@ -531,16 +559,16 @@ Frontend Nginx multi-stage build + `/api` proxy, CORS tightened to frontend orig
 
 ### Phase 7 — README polish & final review
 
-Screenshots, final code review pass, demo gif.
+Screenshots, final code review pass, walkthrough gif.
 
 ---
 
 ## Known Limitations
 
-- Frontend has not been built against the backend yet — that's Phase 3/4.
 - Backend test suite is broken until Phase 5 rewrites it against the new layering.
 - Resume upload is not implemented — `resume_url` accepts a URL only.
 - Email notifications are scoped out.
 - No JWT refresh tokens — expiry requires re-login.
 - No rate limiting yet — comes in Phase 6.
 - No request-ID propagation / structured access logs — comes in Phase 6.
+- Frontend Docker image currently uses the Vite dev server; Phase 6 will switch it to a multi-stage Nginx production image.

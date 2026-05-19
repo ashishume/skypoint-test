@@ -16,7 +16,6 @@ from app.routers import applications as applications_router
 from app.routers import auth as auth_router
 from app.routers import hr as hr_router
 from app.routers import jobs as jobs_router
-from app.seed import seed_database
 
 logging.basicConfig(
     level=logging.INFO,
@@ -28,10 +27,6 @@ logger = logging.getLogger("app")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting %s (env=%s)", settings.APP_NAME, settings.APP_ENV)
-    try:
-        seed_database()
-    except Exception:
-        logger.exception("Seeding failed; continuing startup.")
     yield
     logger.info("Shutting down %s", settings.APP_NAME)
     engine.dispose()

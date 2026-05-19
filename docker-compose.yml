@@ -2,8 +2,6 @@ services:
   db:
     image: postgres:16-alpine
     container_name: jobapp_db
-    env_file:
-      - .env
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
@@ -24,12 +22,32 @@ services:
     build:
       context: ./fastapi-app
     container_name: jobapp_backend
-    env_file:
-      - .env
     environment:
       # Override DATABASE_URL so the backend always points at the `db` service
       # inside the Docker network, regardless of what's in .env.
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-appdb}
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-me-please-32-chars-minimum}
+      HR_INVITE_CODE: ${HR_INVITE_CODE:-hr-invite-code-min-8-chars}
+      APP_ENV: ${APP_ENV:-development}
+      APP_NAME: ${APP_NAME:-Job Recruitment Platform}
+      API_V1_PREFIX: ${API_V1_PREFIX:-/api/v1}
+      ALGORITHM: ${ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-10}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-20}
+      DB_POOL_RECYCLE_SECONDS: ${DB_POOL_RECYCLE_SECONDS:-1800}
+      DB_POOL_TIMEOUT_SECONDS: ${DB_POOL_TIMEOUT_SECONDS:-30}
+      DB_STARTUP_TIMEOUT_SECONDS: ${DB_STARTUP_TIMEOUT_SECONDS:-60}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:80}
+      SEED_DATA: ${SEED_DATA:-true}
+      SEED_HR_EMAIL: ${SEED_HR_EMAIL:-admin@test.com}
+      SEED_HR_PASSWORD: ${SEED_HR_PASSWORD:-Admin@1234}
+      SEED_HR_NAME: ${SEED_HR_NAME:-HR Admin}
+      SEED_CANDIDATE_EMAIL: ${SEED_CANDIDATE_EMAIL:-user@test.com}
+      SEED_CANDIDATE_PASSWORD: ${SEED_CANDIDATE_PASSWORD:-User@1234}
+      SEED_CANDIDATE_NAME: ${SEED_CANDIDATE_NAME:-Test Candidate}
+      UVICORN_WORKERS: ${UVICORN_WORKERS:-2}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:
@@ -43,10 +61,13 @@ services:
     build:
       context: ./reactjs-app
     container_name: jobapp_frontend
+    environment:
+      VITE_API_PROXY_TARGET: http://backend:8000
     ports:
       - "${FRONTEND_PORT:-5173}:5173"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - jobapp_net
