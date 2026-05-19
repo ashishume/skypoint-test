@@ -17,6 +17,9 @@ def _patched_session(db):
         def query(self, *args, **kwargs):
             return db.query(*args, **kwargs)
 
+        def execute(self, *args, **kwargs):
+            return db.execute(*args, **kwargs)
+
         def add(self, obj):
             db.add(obj)
 
@@ -25,6 +28,9 @@ def _patched_session(db):
 
         def rollback(self):
             db.rollback()
+
+        def refresh(self, obj):
+            db.refresh(obj)
 
         def close(self):
             self.closed = True

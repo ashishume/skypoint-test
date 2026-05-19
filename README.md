@@ -31,9 +31,9 @@ A full-stack web application for managing job postings and candidate application
 | **2** | Backend feature APIs: jobs CRUD, applications, HR dashboard, repository/service/router layering | **Done** |
 | **3** | Frontend: shell, routing, auth state, lazy-loaded routes | **Done** |
 | **4** | Frontend: HR + Candidate feature pages | **Done** |
-| 5 | Tests: rewrite for Phase 2 layering, add frontend Vitest | Pending (existing 69 backend tests need import updates after the refactor) |
-| 6 | Docker hardening (Nginx, rate limit, security headers) | Pending |
-| 7 | README polish + final review | In progress |
+| **5** | Tests: backend coverage rewrite + frontend Vitest | **Done** |
+| **6** | Docker hardening: Nginx, rate limit, security headers, request IDs | **Done** |
+| **7** | README polish + final review | **Done** |
 
 What works today:
 - `docker compose up --build` brings up Postgres + FastAPI backend + React frontend.
@@ -42,6 +42,8 @@ What works today:
 - Two seed users (HR + Candidate) are created on first boot.
 - Jobs, applications, and dashboard counts come from API-created database records.
 - Frontend includes login/register, protected routes, HR dashboard/jobs/applicants, and Candidate jobs/applications.
+- Backend tests pass at >90% coverage; frontend Vitest coverage reports are configured.
+- Frontend is served by Nginx in Docker with `/api` proxying to FastAPI.
 
 ---
 
@@ -65,6 +67,9 @@ Code review performed against typical production checklists. All items below wer
 | Email normalised to lowercase to prevent dupe-by-casing | ✅ | Verified by smoke test |
 | Non-root Docker user | ✅ | `Dockerfile` creates and switches to `app` user |
 | CORS restricted to configured origins | ✅ | `settings.cors_origins_list` |
+| Auth rate limiting | ✅ | In-memory limiter on `POST /auth/login` and `POST /auth/register`, configurable via env |
+| Security headers | ✅ | FastAPI + Nginx set CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy |
+| Request ID tracing | ✅ | `X-Request-ID` is preserved or generated and returned on every backend response |
 
 ### Code quality / architecture
 
@@ -97,10 +102,10 @@ Code review performed against typical production checklists. All items below wer
 | Single-command startup | ✅ | `docker compose up --build` |
 | Database readiness wait + migrations via Alembic | ✅ | `entrypoint.sh` waits for Postgres, then runs `alembic upgrade head` before serving traffic |
 | Idempotent seed (HR + Candidate users only) | ✅ | `entrypoint.sh` runs `python -m app.seed`; skips existing users on re-run |
-| Healthcheck endpoint + Docker `HEALTHCHECK` | ✅ | `GET /health`, `curl`-based |
+| Healthcheck endpoint + Docker `HEALTHCHECK` | ✅ | Backend `GET /health`; frontend Nginx `/health` |
 | Structured logging | ✅ | Module-level loggers; lifespan + DB errors logged |
 | Graceful shutdown disposes engine | ✅ | `lifespan` finally block |
-| Postgres healthcheck blocks backend until DB ready | ✅ | `depends_on: condition: service_healthy` |
+| Healthcheck-gated startup | ✅ | Postgres blocks backend; backend blocks frontend via `depends_on: condition: service_healthy` |
 | Persistent DB volume | ✅ | Named volume `jobapp_postgres_data` |
 | Env config externalised; `.env` gitignored; `.env.example` template provided | ✅ | Compose has development defaults; `.env` is only needed for overrides |
 
@@ -116,15 +121,12 @@ Code review performed against typical production checklists. All items below wer
 | Response models prevent password leakage | ✅ | `UserResponse` omits `hashed_password` |
 | Enum validation (role, status, job_type) | ✅ | Pydantic + SQLAlchemy `Enum(validate_strings=True)` |
 
-### What is NOT yet production-ready (deliberately scoped to later phases)
+### Deliberately scoped out
 
-- **Rate limiting** on auth endpoints — planned for Phase 6.
-- **Security headers** (HSTS, X-Frame-Options, CSP) — planned for Phase 6 (via Nginx).
-- **Request ID tracing / structured access logs** — planned for Phase 6.
-- **Observability** (metrics, traces) — out of scope for this assessment.
-- **JWT refresh tokens** — out of scope; users re-login after 30 min.
-- **Backend tests rewrite** after Phase 2 refactor — Phase 5. The original 69 tests covered the pre-refactor module paths and will need updating.
-- **Frontend production serving via Nginx** — planned for Phase 6; current Docker frontend runs the Vite server for assessment/dev.
+- **External observability** (metrics, traces) — out of scope for this assessment.
+- **Distributed rate-limit store** — the included limiter is in-memory; use Redis or another shared store for multi-instance production.
+- **JWT refresh tokens** — out of scope; users re-login after access-token expiry.
+- **Resume file uploads** — candidates provide `resume_url` links.
 
 ---
 
@@ -278,6 +280,7 @@ fastapi-app/.env
 | `BCRYPT_ROUNDS` | no (default `12`) | bcrypt cost factor (≥4, ≤15) |
 | `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` / `DB_POOL_RECYCLE_SECONDS` / `DB_POOL_TIMEOUT_SECONDS` | no | Connection pool tuning |
 | `CORS_ORIGINS` | no | Comma-separated allowed frontend origins |
+| `RATE_LIMIT_AUTH_MAX_REQUESTS` / `RATE_LIMIT_AUTH_WINDOW_SECONDS` | no | Auth endpoint rate-limit controls |
 | `UVICORN_WORKERS` | no (default `2`) | Number of uvicorn worker processes |
 | `SEED_DATA` | no (default `false`) | If `true`, auto-creates HR + Candidate users on startup |
 | `SEED_HR_EMAIL` / `SEED_HR_PASSWORD` / `SEED_CANDIDATE_EMAIL` / `SEED_CANDIDATE_PASSWORD` | only if `SEED_DATA=true` | Seed credentials |
@@ -426,7 +429,7 @@ skypoint-test/
 │   │       ├── applications.py
 │   │       └── hr.py
 │   │
-│   └── tests/                  # Outdated — to be rewritten in Phase 5
+│   └── tests/                  # Backend unit/integration tests
 │       ├── conftest.py
 │       ├── test_auth_service.py
 │       ├── test_auth_routes.py
@@ -434,7 +437,8 @@ skypoint-test/
 │       └── test_seed.py
 │
 └── reactjs-app/
-    ├── Dockerfile              # Vite dev server container for assessment/dev
+    ├── Dockerfile              # Multi-stage build served by Nginx
+    ├── nginx.conf              # SPA fallback + /api proxy + security headers
     ├── package.json
     ├── vite.config.ts          # /api proxy + lazy chunk strategy
     ├── tailwind.config.js
@@ -450,7 +454,8 @@ skypoint-test/
         ├── features/           # reusable forms/cards by domain
         ├── layouts/            # protected application shell
         ├── lib/                # utilities + formatters
-        └── pages/              # lazy-loaded route pages
+        ├── pages/              # lazy-loaded route pages
+        └── test/               # Vitest setup
 ```
 
 ---
@@ -462,23 +467,16 @@ skypoint-test/
 | Backend | Python 3.12, FastAPI ≥0.115, SQLAlchemy 2, Alembic, Pydantic v2, pydantic-settings, python-jose (JWT), bcrypt |
 | Database | PostgreSQL 16 |
 | Frontend | React 18, Vite, TypeScript, React Router, TanStack Query, Axios, Tailwind CSS, shadcn-style Radix primitives, React Hook Form, Zod, Framer Motion, Lucide icons |
-| Containerisation | Docker, Docker Compose v2 |
-| Testing | pytest, pytest-cov, httpx (test suite under reconstruction post-refactor) |
+| Containerisation | Docker, Docker Compose v2, Nginx |
+| Testing | pytest, pytest-cov, httpx, Vitest, Testing Library, jsdom, V8 coverage |
 
 ---
 
 ## Testing
 
-The Phase 1 test suite (69 tests, 95% coverage) targeted the original module layout. After the Phase 2 refactor moved auth helpers from `app/services/auth.py` into `app/core/security.py` + `app/services/auth_service.py`, the tests reference the old paths and need rewriting against the new layering.
+### Backend
 
-**Validation in the interim:**
-- An end-to-end smoke covering every Phase 2 endpoint was executed and passes (register/login HR + Candidate, job CRUD, role guards, apply/duplicate/closed-job rules, status updates, HR dashboard, pagination, candidate visibility rules). See the [Production-Readiness Validation](#production-readiness-validation) checklist.
-
-**Phase 5 will deliver:**
-- Rewritten backend tests at ≥90% coverage targeting routers → services → repositories.
-- Frontend tests (Vitest + Testing Library) for components / forms / protected routes.
-
-To run the (currently-failing-on-import) suite:
+The backend test suite targets the current router → service → repository layering and covers auth, role guards, jobs, applications, dashboard aggregates, seeding, security headers, request IDs, and rate limiting.
 
 ```bash
 cd fastapi-app
@@ -486,6 +484,20 @@ python -m venv .venv
 .venv/bin/pip install -r requirements.txt
 .venv/bin/python -m pytest
 ```
+
+Latest local result: **84 passed**, **97.01% coverage**.
+
+### Frontend
+
+Frontend unit tests cover API client wrappers, defensive token storage, reusable common components, job/application forms, and job cards.
+
+```bash
+cd reactjs-app
+npm install
+npm run test:coverage
+```
+
+Latest local result: **17 passed**, with a V8 coverage report emitted to `reactjs-app/coverage/`.
 
 ---
 
@@ -549,26 +561,24 @@ React Router v6, Axios + interceptors, TanStack Query, `AuthContext`, protected 
 
 HR dashboard, jobs management, application review. Candidate job board, job detail/apply, my applications.
 
-### Phase 5 — Tests
+### Phase 5 — Tests **(done)**
 
-Rewrite backend tests for the new layering (target ≥90% coverage). Add frontend tests (Vitest + Testing Library).
+Backend tests rewritten for the new layering at >90% coverage. Frontend Vitest + Testing Library tests added with V8 coverage reports.
 
-### Phase 6 — Docker hardening & Security
+### Phase 6 — Docker hardening & Security **(done)**
 
-Frontend Nginx multi-stage build + `/api` proxy, CORS tightened to frontend origin, rate limiting (`slowapi`) on auth endpoints, security headers, request-ID middleware.
+Frontend Nginx multi-stage build + `/api` proxy, healthcheck-gated Compose startup, auth rate limiting, backend/frontend security headers, and request-ID middleware.
 
-### Phase 7 — README polish & final review
+### Phase 7 — README polish & final review **(done)**
 
-Screenshots, final code review pass, walkthrough gif.
+README updated with current architecture, run flow, test credentials, feature walkthrough, test commands, coverage results, and known limitations.
 
 ---
 
 ## Known Limitations
 
-- Backend test suite is broken until Phase 5 rewrites it against the new layering.
 - Resume upload is not implemented — `resume_url` accepts a URL only.
 - Email notifications are scoped out.
 - No JWT refresh tokens — expiry requires re-login.
-- No rate limiting yet — comes in Phase 6.
-- No request-ID propagation / structured access logs — comes in Phase 6.
-- Frontend Docker image currently uses the Vite dev server; Phase 6 will switch it to a multi-stage Nginx production image.
+- Auth rate limiting is in-memory and per backend worker; use a shared store such as Redis for horizontally scaled deployments.
+- Metrics/traces are not included.

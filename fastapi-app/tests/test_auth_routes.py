@@ -5,7 +5,7 @@ import pytest
 from jose import jwt
 
 from app.config import settings
-from app.services.auth import create_access_token, decode_access_token
+from app.core.security import create_access_token, decode_access_token
 
 REGISTER = "/api/v1/auth/register"
 LOGIN = "/api/v1/auth/login"

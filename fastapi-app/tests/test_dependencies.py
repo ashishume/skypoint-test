@@ -1,7 +1,7 @@
 """Tests for role-enforcement dependencies."""
 import pytest
-from fastapi import HTTPException
 
+from app.core.exceptions import ForbiddenError
 from app.dependencies import require_candidate, require_hr
 
 
@@ -10,7 +10,7 @@ class TestRequireHR:
         assert require_hr(hr_user) is hr_user
 
     def test_blocks_candidate(self, candidate_user):
-        with pytest.raises(HTTPException) as exc:
+        with pytest.raises(ForbiddenError) as exc:
             require_hr(candidate_user)
         assert exc.value.status_code == 403
 
@@ -20,6 +20,6 @@ class TestRequireCandidate:
         assert require_candidate(candidate_user) is candidate_user
 
     def test_blocks_hr(self, hr_user):
-        with pytest.raises(HTTPException) as exc:
+        with pytest.raises(ForbiddenError) as exc:
             require_candidate(hr_user)
         assert exc.value.status_code == 403

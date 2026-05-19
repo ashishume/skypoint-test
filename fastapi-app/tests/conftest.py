@@ -14,6 +14,8 @@ os.environ.setdefault("CORS_ORIGINS", "http://test")
 os.environ.setdefault("SEED_DATA", "false")
 os.environ.setdefault("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
 os.environ.setdefault("BCRYPT_ROUNDS", "4")
+os.environ.setdefault("RATE_LIMIT_AUTH_MAX_REQUESTS", "10000")
+os.environ.setdefault("RATE_LIMIT_AUTH_WINDOW_SECONDS", "60")
 
 import pytest
 from fastapi.testclient import TestClient
@@ -25,7 +27,7 @@ from app.database import get_db
 from app.main import app
 from app.models.base import Base
 from app.models.user import User, UserRole
-from app.services.auth import hash_password
+from app.core.security import hash_password
 
 _test_engine = create_engine(
     "sqlite:///:memory:",

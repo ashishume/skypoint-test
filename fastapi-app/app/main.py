@@ -11,6 +11,11 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.config import settings
 from app.core.exceptions import DomainError, UnauthorizedError
+from app.core.middleware import (
+    AuthRateLimitMiddleware,
+    RequestIdMiddleware,
+    SecurityHeadersMiddleware,
+)
 from app.database import engine
 from app.routers import applications as applications_router
 from app.routers import auth as auth_router
@@ -49,6 +54,9 @@ def create_app() -> FastAPI:
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type"],
     )
+    application.add_middleware(AuthRateLimitMiddleware)
+    application.add_middleware(RequestIdMiddleware)
+    application.add_middleware(SecurityHeadersMiddleware)
 
     _register_exception_handlers(application)
     _register_routers(application)

@@ -38,6 +38,9 @@ class Settings(BaseSettings):
 
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:80"
 
+    RATE_LIMIT_AUTH_MAX_REQUESTS: int = Field(default=20, ge=1, le=10_000)
+    RATE_LIMIT_AUTH_WINDOW_SECONDS: int = Field(default=60, ge=1, le=3600)
+
     SEED_DATA: bool = False
     SEED_HR_EMAIL: Optional[str] = None
     SEED_HR_PASSWORD: Optional[str] = None

@@ -6,13 +6,15 @@ from jose import jwt
 from jose.exceptions import ExpiredSignatureError, JWTError
 
 from app.config import settings
-from app.services.auth import (
-    authenticate_user,
+from app.core.exceptions import UnauthorizedError
+from app.core.security import (
     create_access_token,
     decode_access_token,
     hash_password,
     verify_password,
 )
+from app.repositories.user_repository import UserRepository
+from app.services.auth_service import AuthService
 
 
 class TestPasswordHashing:
@@ -60,7 +62,7 @@ class TestJWT:
         assert decode_access_token(token)["role"] == "hr"
 
     def test_create_token_drops_reserved_extra_claims(self):
-        token = create_access_function = create_access_token(
+        token = create_access_token(
             subject=1,
             extra_claims={"sub": "hijacked", "type": "refresh", "extra": "kept"},
         )
@@ -93,18 +95,21 @@ class TestJWT:
 
 class TestAuthenticateUser:
     def test_success(self, db, candidate_user):
-        u = authenticate_user(db, "candidate@test.com", "Candidate@123")
+        u = AuthService(UserRepository(db)).authenticate("candidate@test.com", "Candidate@123")
         assert u is not None and u.id == candidate_user.id
 
     def test_email_is_case_insensitive(self, db, candidate_user):
-        assert authenticate_user(db, "CANDIDATE@TEST.COM", "Candidate@123") is not None
+        assert AuthService(UserRepository(db)).authenticate("CANDIDATE@TEST.COM", "Candidate@123") is not None
 
     def test_wrong_password(self, db, candidate_user):
-        assert authenticate_user(db, "candidate@test.com", "Wrong@123") is None
+        with pytest.raises(UnauthorizedError):
+            AuthService(UserRepository(db)).authenticate("candidate@test.com", "Wrong@123")
 
     def test_unknown_email_runs_dummy_hash(self, db):
         # Returns None but must not raise; dummy hash equalizes timing.
-        assert authenticate_user(db, "nobody@test.com", "Whatever@1") is None
+        with pytest.raises(UnauthorizedError):
+            AuthService(UserRepository(db)).authenticate("nobody@test.com", "Whatever@1")
 
     def test_inactive_user_blocked(self, db, inactive_user):
-        assert authenticate_user(db, "inactive@test.com", "Inactive@123") is None
+        with pytest.raises(UnauthorizedError):
+            AuthService(UserRepository(db)).authenticate("inactive@test.com", "Inactive@123")

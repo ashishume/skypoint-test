@@ -40,6 +40,8 @@ services:
       DB_POOL_TIMEOUT_SECONDS: ${DB_POOL_TIMEOUT_SECONDS:-30}
       DB_STARTUP_TIMEOUT_SECONDS: ${DB_STARTUP_TIMEOUT_SECONDS:-60}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:80}
+      RATE_LIMIT_AUTH_MAX_REQUESTS: ${RATE_LIMIT_AUTH_MAX_REQUESTS:-20}
+      RATE_LIMIT_AUTH_WINDOW_SECONDS: ${RATE_LIMIT_AUTH_WINDOW_SECONDS:-60}
       SEED_DATA: ${SEED_DATA:-true}
       SEED_HR_EMAIL: ${SEED_HR_EMAIL:-admin@test.com}
       SEED_HR_PASSWORD: ${SEED_HR_PASSWORD:-Admin@1234}
@@ -61,10 +63,8 @@ services:
     build:
       context: ./reactjs-app
     container_name: jobapp_frontend
-    environment:
-      VITE_API_PROXY_TARGET: http://backend:8000
     ports:
-      - "${FRONTEND_PORT:-5173}:5173"
+      - "${FRONTEND_PORT:-5173}:80"
     depends_on:
       backend:
         condition: service_healthy
