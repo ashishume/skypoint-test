@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { Send } from "lucide-react";
+import { ChevronLeft, ChevronRight, Send } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -33,6 +33,7 @@ import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { useAuth } from "@/app/auth-context";
 
 const JOBS_PAGE_SIZE = 6;
+const RECOMMENDATIONS_PER_PAGE = 2;
 
 export default function CandidateJobsPage() {
   const { user } = useAuth();
@@ -294,17 +295,69 @@ function RecommendedJobs({
   isLoading: boolean;
   onApply: (job: Job) => void;
 }) {
+  const [page, setPage] = useState(0);
+  const pageCount = Math.max(1, Math.ceil(recommendations.length / RECOMMENDATIONS_PER_PAGE));
+  const visibleRecommendations = recommendations.slice(
+    page * RECOMMENDATIONS_PER_PAGE,
+    page * RECOMMENDATIONS_PER_PAGE + RECOMMENDATIONS_PER_PAGE
+  );
+  const canSlide = recommendations.length > RECOMMENDATIONS_PER_PAGE;
+
+  useEffect(() => {
+    if (page > pageCount - 1) setPage(0);
+  }, [page, pageCount]);
+
+  function previousPage() {
+    setPage((current) => (current === 0 ? pageCount - 1 : current - 1));
+  }
+
+  function nextPage() {
+    setPage((current) => (current + 1) % pageCount);
+  }
+
   return (
     <section className="space-y-4">
-      <h2 className="text-2xl font-bold tracking-tight">Recommended for You</h2>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-2xl font-bold tracking-tight">Recommended for You</h2>
+        {canSlide ? (
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={previousPage}
+              aria-label="Show previous recommendations"
+              className="h-10 w-10 rounded-full bg-white shadow-sm"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={nextPage}
+              aria-label="Show next recommendations"
+              className="h-10 w-10 rounded-full bg-white shadow-sm"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </Button>
+          </div>
+        ) : null}
+      </div>
       {isLoading ? (
         <div className="grid gap-4 md:grid-cols-2">
           <Skeleton className="h-72 rounded-lg" />
           <Skeleton className="h-72 rounded-lg" />
         </div>
       ) : recommendations.length ? (
-        <div className="grid gap-4 md:grid-cols-2">
-          {recommendations.slice(0, 2).map((recommendation) => (
+        <motion.div
+          key={page}
+          initial={{ opacity: 0, x: 18 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.22, ease: "easeOut" }}
+          className="grid gap-4 md:grid-cols-2"
+        >
+          {visibleRecommendations.map((recommendation) => (
             <JobCard
               key={recommendation.job.id}
               job={recommendation.job}
@@ -317,7 +370,7 @@ function RecommendedJobs({
               }
             />
           ))}
-        </div>
+        </motion.div>
       ) : (
         <div className="rounded-lg border border-dashed bg-white p-6 text-sm font-medium text-muted-foreground">
           Add skills and work experience to your profile to unlock tailored recommendations.
