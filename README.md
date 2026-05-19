@@ -1,6 +1,6 @@
-# Job Recruitment Management System
+# RecruitFlow
 
-A full-stack web application for managing job postings, candidate applications, candidate profiles, and recruiter-to-candidate messaging — built with FastAPI, React, and PostgreSQL, fully containerised with Docker Compose.
+A full-stack recruitment workflow application for managing job postings, candidate applications, candidate profiles, match-based recommendations, and recruiter-to-candidate messaging — built with FastAPI, React, and PostgreSQL, fully containerised with Docker Compose.
 
 ---
 
@@ -19,6 +19,7 @@ A full-stack web application for managing job postings, candidate applications, 
 11. [Testing](#testing)
 12. [Feature Walkthrough](#feature-walkthrough)
 13. [Known Limitations](#known-limitations)
+14. [AI-Assisted Development Notes](#ai-assisted-development-notes)
 
 ---
 
@@ -41,9 +42,9 @@ What works today:
 - `docker compose up --build` brings up Postgres + FastAPI backend + React frontend.
 - 22+ endpoints across `/auth`, `/jobs`, `/applications`, `/hr`, `/candidate`, `/messages`, plus `/health`.
 - Database schema for `users`, `job_postings`, `applications`, `candidate_profiles`, `message_threads`, `messages` is migrated on startup.
-- Two seed users (HR + Candidate) are created on first boot.
+- Assessment seed data is created on first boot: HR + Candidate users, demo jobs, a candidate profile, one application, and one recruiter message thread.
 - Jobs, applications, profiles, recommendations, and messages all come from API-created database records.
-- Frontend includes login/register, protected routes, HR dashboard/jobs/candidates, Candidate jobs/applications/profile/messages.
+- Frontend includes demo login, protected routes, HR dashboard/jobs/candidates, Candidate jobs/applications/profile/messages.
 - Backend tests pass at >90% coverage; frontend Vitest coverage reports are configured.
 - Frontend is served by Nginx in Docker with `/api` proxying to FastAPI.
 
@@ -57,7 +58,7 @@ Code review performed against typical production checklists. All items below wer
 
 | Item | Status | Notes |
 |---|---|---|
-| No hardcoded secrets in application code | ✅ | `grep` finds zero credential literals in `app/`. All loaded via `pydantic-settings` from env vars. |
+| No production secrets in backend application code | ✅ | Backend secrets are loaded via `pydantic-settings`; demo credentials are assessment-only seed values and are documented below. |
 | `SECRET_KEY` required from env (≥32 chars, fail-fast) | ✅ | `Field(..., min_length=32)` |
 | Passwords hashed with bcrypt (configurable cost ≥4, default 12) | ✅ | `app/core/security.py` |
 | Timing-safe authentication | ✅ | `consume_dummy_hash()` invoked on unknown-email path |
@@ -105,12 +106,12 @@ Code review performed against typical production checklists. All items below wer
 |---|---|---|
 | Single-command startup | ✅ | `docker compose up --build` |
 | Database readiness wait + migrations via Alembic | ✅ | `entrypoint.sh` waits for Postgres, then runs `alembic upgrade head` before serving traffic |
-| Idempotent seed (HR + Candidate users only) | ✅ | `entrypoint.sh` runs `python -m app.seed`; skips existing users on re-run |
+| Idempotent seed (users + demo workspace) | ✅ | `entrypoint.sh` runs `python -m app.seed`; skips existing users/data on re-run |
 | Healthcheck endpoint + Docker `HEALTHCHECK` | ✅ | Backend `GET /health`; frontend Nginx `/health` |
 | Structured logging | ✅ | Module-level loggers; lifespan + DB errors logged |
 | Graceful shutdown disposes engine | ✅ | `lifespan` finally block |
 | Healthcheck-gated startup | ✅ | Postgres blocks backend; backend blocks frontend via `depends_on: condition: service_healthy` |
-| Persistent DB volume | ✅ | Named volume `jobapp_postgres_data` |
+| Persistent DB volume | ✅ | Named volume `recruitflow_postgres_data` |
 | Env config externalised; `.env` gitignored; `.env.example` template provided | ✅ | Compose has development defaults; `.env` is only needed for overrides |
 
 ### Validation (input / output)
@@ -141,7 +142,7 @@ Code review performed against typical production checklists. All items below wer
 This platform connects **HR managers** and **job candidates** through a centralised recruitment workflow:
 
 - HR managers post and manage job openings, review incoming applications, update applicant statuses (Pending → Reviewed → Shortlisted → Rejected), browse all registered candidates, and send direct messages to applicants from within the candidate profile dialog.
-- Candidates browse open positions, submit applications with cover letters, track their application status in real time, build a rich candidate profile (skills, experience, salary expectations, preferred roles), receive AI-powered job recommendations ranked by skill-match score, and reply to recruiter messages from a dedicated Messages tab.
+- Candidates browse open positions, submit applications with cover letters, track their application status in real time, build a rich candidate profile (skills, experience, salary expectations, preferred roles), receive match-scored job recommendations, and reply to recruiter messages from a dedicated Messages tab.
 
 The application enforces strict role-based access control — every endpoint is protected by the authenticated user's role. Message ownership rules ensure HR can only contact candidates on their own job postings, and candidates can only view and reply to threads addressed to them.
 
@@ -238,10 +239,17 @@ No additional configuration is required. `docker-compose.yml` includes developme
 
 1. Waits for PostgreSQL to accept connections.
 2. Runs `alembic upgrade head` to create/update the database tables.
-3. Runs `python -m app.seed` to create the assessment HR and Candidate users.
+3. Runs `python -m app.seed` to create the assessment HR/Candidate users and demo workspace data.
 4. Starts Uvicorn.
 
 Create a root `.env` only if you want to override the documented defaults.
+
+To verify the exact fresh-clone path that assessors will use, reset the Docker volume and start again:
+
+```bash
+docker compose down -v
+docker compose up --build
+```
 
 ---
 
@@ -272,7 +280,7 @@ All secrets and tunables come from environment variables — no hardcoded values
 | `CORS_ORIGINS` | no | Comma-separated allowed frontend origins |
 | `RATE_LIMIT_AUTH_MAX_REQUESTS` / `RATE_LIMIT_AUTH_WINDOW_SECONDS` | no | Auth endpoint rate-limit controls |
 | `UVICORN_WORKERS` | no (default `2`) | Number of uvicorn worker processes |
-| `SEED_DATA` | no (default `false`) | If `true`, auto-creates HR + Candidate users on startup |
+| `SEED_DATA` | no (Docker Compose default `true`; backend default `false`) | If `true`, auto-creates assessment users and demo workspace data on startup |
 | `SEED_HR_EMAIL` / `SEED_HR_PASSWORD` / `SEED_CANDIDATE_EMAIL` / `SEED_CANDIDATE_PASSWORD` | only if `SEED_DATA=true` | Seed credentials |
 
 See `.env.example` for the full annotated list.
@@ -369,6 +377,8 @@ Seeded automatically when `SEED_DATA=true` (the default in `docker-compose.yml`)
 | Candidate | `user@test.com` | `User@1234` |
 
 Override via the `SEED_HR_*` / `SEED_CANDIDATE_*` env vars.
+
+The seeded workspace also includes demo jobs, a candidate profile, one application, and one recruiter message so both roles have meaningful data immediately after a fresh Docker startup.
 
 ---
 
@@ -520,11 +530,11 @@ python -m venv .venv
 .venv/bin/python -m pytest
 ```
 
-Latest local result: **84+ passed**, **>97% coverage**.
+Latest local result: **92 passed**, **96%+ coverage**.
 
 ### Frontend
 
-Frontend unit tests cover API client wrappers, defensive token storage, reusable common components, job/application forms, and job cards.
+Frontend unit tests cover API client wrappers, defensive token storage, reusable common components, job/application forms, job cards, and the candidate messaging reply flow.
 
 ```bash
 cd reactjs-app
@@ -532,7 +542,7 @@ npm install
 npm run test:coverage
 ```
 
-Latest local result: **17 passed**, with a V8 coverage report emitted to `reactjs-app/coverage/`.
+Latest local result: **18 passed**, with a V8 coverage report emitted to `reactjs-app/coverage/`.
 
 ---
 
@@ -579,7 +589,7 @@ Sign in at `http://localhost:5173/auth`, then use the Candidate navigation.
 - No JWT refresh tokens — expiry requires re-login.
 - Auth rate limiting is in-memory and per backend worker; use a shared store such as Redis for horizontally scaled deployments.
 - Metrics/traces are not included.
-- Messaging is pull-based (no WebSocket push); candidates must refresh to see new messages.
+- Messaging is pull-based (no WebSocket push); candidate replies update immediately, but new HR messages are fetched when the Messages page/query reloads.
 
 ### Deliberate trade-offs
 
@@ -590,3 +600,9 @@ Sign in at `http://localhost:5173/auth`, then use the Candidate navigation.
 | **Synchronous recommendation algorithm** | Avoids a background-task dependency (Celery/RQ) while still demonstrating the skill-matching logic. | Offload to an async worker so the HTTP response time is not coupled to recommendation computation; add a dedicated recommendations table for caching results. |
 | **Skills as JSON column** | Keeps the schema simple and avoids a join table for this scale. | Normalise into a `skills` lookup table + `job_skills` / `candidate_skills` join tables, and switch the column type to JSONB (PostgreSQL) for GIN-indexed containment queries. |
 | **Pull-based messaging** | No WebSocket dependency required for this scope. | Add a WebSocket or SSE channel so candidates are notified of new messages in real time. |
+
+---
+
+## AI-Assisted Development Notes
+
+Claude Code was used as the primary development assistant for scaffolding, implementation, refactoring, test generation, and review. Final verification was performed with local backend/frontend test commands and Docker-oriented review so the repository remains runnable by an assessor with `docker compose up --build`.

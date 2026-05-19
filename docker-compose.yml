@@ -1,7 +1,7 @@
 services:
   db:
     image: postgres:16-alpine
-    container_name: jobapp_db
+    container_name: recruitflow_db
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
@@ -18,12 +18,12 @@ services:
       start_period: 10s
     restart: unless-stopped
     networks:
-      - jobapp_net
+      - recruitflow_net
 
   backend:
     build:
       context: ./fastapi-app
-    container_name: jobapp_backend
+    container_name: recruitflow_backend
     environment:
       # Override DATABASE_URL so the backend always points at the `db` service
       # inside the Docker network, regardless of what's in .env.
@@ -59,12 +59,12 @@ services:
         condition: service_healthy
     restart: unless-stopped
     networks:
-      - jobapp_net
+      - recruitflow_net
 
   frontend:
     build:
       context: ./reactjs-app
-    container_name: jobapp_frontend
+    container_name: recruitflow_frontend
     ports:
       - "${FRONTEND_PORT:-5173}:80"
     depends_on:
@@ -72,12 +72,12 @@ services:
         condition: service_healthy
     restart: unless-stopped
     networks:
-      - jobapp_net
+      - recruitflow_net
 
 volumes:
   postgres_data:
-    name: jobapp_postgres_data
+    name: recruitflow_postgres_data
 
 networks:
-  jobapp_net:
+  recruitflow_net:
     driver: bridge
