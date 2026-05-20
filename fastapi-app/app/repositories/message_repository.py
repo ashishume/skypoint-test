@@ -71,6 +71,23 @@ class MessageThreadRepository(BaseRepository[MessageThread]):
             .all()
         )
 
+    def list_for_hr(self, *, hr_id: int) -> List[MessageThread]:
+        return list(
+            self.db.execute(
+                select(MessageThread)
+                .options(
+                    selectinload(MessageThread.job),
+                    selectinload(MessageThread.candidate),
+                    selectinload(MessageThread.hr),
+                    selectinload(MessageThread.messages).selectinload(Message.sender),
+                )
+                .where(MessageThread.hr_id == hr_id)
+                .order_by(MessageThread.updated_at.desc(), MessageThread.id.desc())
+            )
+            .scalars()
+            .all()
+        )
+
     def add_message(self, *, thread: MessageThread, sender_id: int, body: str) -> Message:
         message = Message(thread_id=thread.id, sender_id=sender_id, body=body.strip())
         thread.updated_at = datetime.now(timezone.utc)

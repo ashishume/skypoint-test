@@ -21,6 +21,12 @@ def auth_header(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+def login(client: TestClient, *, email: str, password: str) -> str:
+    response = client.post("/api/v1/auth/login", json={"email": email, "password": password})
+    assert response.status_code == 200, response.text
+    return response.json()["access_token"]
+
+
 def job_payload(**overrides):
     payload = {
         "title": "Backend Engineer",
@@ -247,6 +253,40 @@ class TestJobRoutes:
         assert delete.status_code == 204
         assert missing.status_code == 404
 
+    def test_hr_cannot_access_another_hr_jobs(
+        self,
+        client: TestClient,
+        db: Session,
+        hr_user: User,
+        hr_token: str,
+    ):
+        other_hr = User(
+            email="other-owner@test.com",
+            hashed_password=hash_password("OtherHr@123"),
+            full_name="Other HR",
+            role=UserRole.HR,
+        )
+        db.add(other_hr)
+        db.commit()
+        db.refresh(other_hr)
+        other_token = login(client, email=other_hr.email, password="OtherHr@123")
+        job = create_job(db, hr_user, title="Private Role")
+
+        list_response = client.get(JOBS, headers=auth_header(other_token))
+        get_response = client.get(f"{JOBS}/{job.id}", headers=auth_header(other_token))
+        update_response = client.put(
+            f"{JOBS}/{job.id}",
+            json={"status": "closed"},
+            headers=auth_header(other_token),
+        )
+        delete_response = client.delete(f"{JOBS}/{job.id}", headers=auth_header(other_token))
+
+        assert list_response.status_code == 200
+        assert all(item["id"] != job.id for item in list_response.json()["items"])
+        assert get_response.status_code == 403
+        assert update_response.status_code == 403
+        assert delete_response.status_code == 403
+
 
 class TestApplicationRoutes:
     def test_candidate_can_apply_and_list_own_applications(
@@ -347,6 +387,37 @@ class TestApplicationRoutes:
         assert list_response.json()["items"][0]["candidate"]["email"] == candidate_user.email
         assert update_response.status_code == 200
         assert update_response.json()["status"] == "shortlisted"
+
+    def test_hr_cannot_view_or_update_another_hr_applications(
+        self,
+        client: TestClient,
+        db: Session,
+        hr_user: User,
+        candidate_user: User,
+        hr_token: str,
+    ):
+        other_hr = User(
+            email="application-owner@test.com",
+            hashed_password=hash_password("OtherHr@123"),
+            full_name="Application Owner",
+            role=UserRole.HR,
+        )
+        db.add(other_hr)
+        db.commit()
+        db.refresh(other_hr)
+        other_token = login(client, email=other_hr.email, password="OtherHr@123")
+        job = create_job(db, hr_user, title="Owned Applicant Role")
+        application = create_application(db, job, candidate_user)
+
+        list_response = client.get(f"{JOBS}/{job.id}/applications", headers=auth_header(other_token))
+        update_response = client.patch(
+            f"{APPLICATIONS}/{application.id}/status",
+            json={"status": "shortlisted"},
+            headers=auth_header(other_token),
+        )
+
+        assert list_response.status_code == 403
+        assert update_response.status_code == 403
 
     def test_hr_can_track_candidates_with_profile_match_scores(
         self,
@@ -452,6 +523,17 @@ class TestApplicationRoutes:
         closed_job = create_job(db, hr_user, title="Closed", status=JobStatus.CLOSED)
         create_application(db, open_job, candidate_user, status=ApplicationStatus.REVIEWED)
         create_application(db, closed_job, candidate_user, status=ApplicationStatus.REJECTED)
+        other_hr = User(
+            email="dashboard-other@test.com",
+            hashed_password=hash_password("OtherHr@123"),
+            full_name="Dashboard Other",
+            role=UserRole.HR,
+        )
+        db.add(other_hr)
+        db.commit()
+        db.refresh(other_hr)
+        hidden_job = create_job(db, other_hr, title="Hidden Dashboard Role")
+        create_application(db, hidden_job, candidate_user, status=ApplicationStatus.PENDING)
 
         response = client.get(HR_DASHBOARD, headers=auth_header(hr_token))
 

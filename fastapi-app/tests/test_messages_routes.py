@@ -115,6 +115,22 @@ class TestMessagesRoutes:
             "Thanks, I am available tomorrow afternoon.",
         ]
 
+        hr_threads_response = client.get(f"{MESSAGES}/hr", headers=auth_header(hr_token))
+        hr_reply_response = client.post(
+            f"{MESSAGES}/hr/{sent_thread['id']}/reply",
+            json={"body": "Great, I sent an invite."},
+            headers=auth_header(hr_token),
+        )
+
+        assert hr_threads_response.status_code == 200
+        assert hr_threads_response.json()[0]["id"] == sent_thread["id"]
+        assert hr_reply_response.status_code == 200
+        assert [message["body"] for message in hr_reply_response.json()["messages"]] == [
+            "Hi, we would like to schedule a technical discussion.",
+            "Thanks, I am available tomorrow afternoon.",
+            "Great, I sent an invite.",
+        ]
+
     def test_hr_cannot_message_candidate_without_application(
         self,
         client: TestClient,
@@ -159,3 +175,41 @@ class TestMessagesRoutes:
         )
 
         assert response.status_code == 403
+
+    def test_hr_cannot_view_or_reply_to_another_hr_thread(
+        self,
+        client: TestClient,
+        db: Session,
+        hr_user: User,
+        candidate_user: User,
+        hr_token: str,
+    ):
+        job = create_job(db, hr_user)
+        create_application(db, job, candidate_user)
+        other_hr = User(
+            email="other-message-hr@test.com",
+            hashed_password=hash_password("OtherHr@123"),
+            full_name="Other HR",
+            role=UserRole.HR,
+        )
+        db.add(other_hr)
+        db.commit()
+        db.refresh(other_hr)
+        other_token = login(client, email=other_hr.email, password="OtherHr@123")
+        send_response = client.post(
+            f"{MESSAGES}/hr",
+            json={"candidate_id": candidate_user.id, "job_id": job.id, "body": "Hello."},
+            headers=auth_header(hr_token),
+        )
+        assert send_response.status_code == 201
+
+        list_response = client.get(f"{MESSAGES}/hr", headers=auth_header(other_token))
+        reply_response = client.post(
+            f"{MESSAGES}/hr/{send_response.json()['id']}/reply",
+            json={"body": "This is not my thread."},
+            headers=auth_header(other_token),
+        )
+
+        assert list_response.status_code == 200
+        assert list_response.json() == []
+        assert reply_response.status_code == 403

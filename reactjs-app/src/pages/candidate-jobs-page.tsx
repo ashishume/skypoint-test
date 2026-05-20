@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { applicationsApi, candidateProfileApi, getApiError } from "@/api/client";
-import type { ApplicationWithJob, Job, JobRecommendation } from "@/api/types";
+import type { ApplicationWithJob, Job, JobRecommendation, JobType } from "@/api/types";
 import { EmptyState } from "@/components/common/empty-state";
 import { PaginationControls } from "@/components/common/pagination-controls";
 import { PageHeader } from "@/components/common/page-header";
@@ -40,17 +40,35 @@ export default function CandidateJobsPage() {
   const firstName = user?.full_name?.split(" ")[0] ?? "there";
   const [draftKeyword, setDraftKeyword] = useState("");
   const [draftLocation, setDraftLocation] = useState("");
+  const [draftSkill, setDraftSkill] = useState("");
+  const [draftJobType, setDraftJobType] = useState<JobType | "all">("all");
   const [draftSalaryRange, setDraftSalaryRange] = useState("any");
-  const [filters, setFilters] = useState({ keyword: "", location: "", salaryRange: "any" });
+  const [filters, setFilters] = useState({
+    keyword: "",
+    location: "",
+    skill: "",
+    jobType: "all" as JobType | "all",
+    salaryRange: "any",
+  });
   const [page, setPage] = useState(1);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const debouncedKeyword = useDebouncedValue(draftKeyword.trim(), 350);
   const debouncedLocation = useDebouncedValue(draftLocation.trim(), 350);
+  const debouncedSkill = useDebouncedValue(draftSkill.trim(), 350);
+  const debouncedJobType = useDebouncedValue(draftJobType, 350);
   const debouncedSalaryRange = useDebouncedValue(draftSalaryRange, 350);
   const isActiveSearchRoute = searchParams.get("searchMode") === "1";
-  const hasActiveSearch = isActiveSearchRoute || Boolean(filters.keyword || filters.location || filters.salaryRange !== "any");
+  const hasActiveSearch =
+    isActiveSearchRoute ||
+    Boolean(
+      filters.keyword ||
+        filters.location ||
+        filters.skill ||
+        filters.jobType !== "all" ||
+        filters.salaryRange !== "any"
+    );
 
   useEffect(() => {
     setPage(1);
@@ -60,12 +78,20 @@ export default function CandidateJobsPage() {
     setFilters({
       keyword: debouncedKeyword,
       location: debouncedLocation,
+      skill: debouncedSkill,
+      jobType: debouncedJobType,
       salaryRange: debouncedSalaryRange,
     });
-    if (debouncedKeyword || debouncedLocation || debouncedSalaryRange !== "any") {
+    if (
+      debouncedKeyword ||
+      debouncedLocation ||
+      debouncedSkill ||
+      debouncedJobType !== "all" ||
+      debouncedSalaryRange !== "any"
+    ) {
       setSearchParams({ searchMode: "1" }, { replace: true });
     }
-  }, [debouncedKeyword, debouncedLocation, debouncedSalaryRange]);
+  }, [debouncedKeyword, debouncedLocation, debouncedSkill, debouncedJobType, debouncedSalaryRange]);
 
   const salary = salaryRangeFilters[filters.salaryRange] ?? salaryRangeFilters.any;
   const matchesQuery = useQuery({
@@ -74,6 +100,8 @@ export default function CandidateJobsPage() {
       candidateProfileApi.jobMatches({
         search: filters.keyword || undefined,
         location: filters.location || undefined,
+        skill: filters.skill || undefined,
+        job_type: filters.jobType === "all" ? undefined : filters.jobType,
         salary_min: salary.min,
         salary_max: salary.max,
         limit: JOBS_PAGE_SIZE,
@@ -138,9 +166,13 @@ export default function CandidateJobsPage() {
         <JobSearchFilters
           keyword={draftKeyword}
           location={draftLocation}
+          skill={draftSkill}
+          jobType={draftJobType}
           salaryRange={draftSalaryRange}
           onKeywordChange={setDraftKeyword}
           onLocationChange={setDraftLocation}
+          onSkillChange={setDraftSkill}
+          onJobTypeChange={setDraftJobType}
           onSalaryRangeChange={setDraftSalaryRange}
         />
 

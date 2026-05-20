@@ -15,6 +15,7 @@ class JobRepository(BaseRepository[JobPosting]):
         *,
         limit: int,
         offset: int,
+        created_by_id: Optional[int] = None,
         status: Optional[JobStatus] = None,
         location: Optional[str] = None,
         job_type: Optional[JobType] = None,
@@ -24,6 +25,8 @@ class JobRepository(BaseRepository[JobPosting]):
         salary_max: Optional[int] = None,
     ) -> Tuple[List[JobPosting], int]:
         stmt = select(JobPosting).order_by(JobPosting.created_at.desc(), JobPosting.id.desc())
+        if created_by_id is not None:
+            stmt = stmt.where(JobPosting.created_by_id == created_by_id)
         if status is not None:
             stmt = stmt.where(JobPosting.status == status)
         if location:
@@ -64,12 +67,12 @@ class JobRepository(BaseRepository[JobPosting]):
         )
         return list(self.db.execute(stmt).scalars().all())
 
-    def status_counts(self) -> Dict[JobStatus, int]:
+    def status_counts(self, *, created_by_id: Optional[int] = None) -> Dict[JobStatus, int]:
         """Count jobs grouped by status. Statuses absent from the DB return 0."""
-        rows = self.db.execute(
-            select(JobPosting.status, func.count(JobPosting.id))
-            .group_by(JobPosting.status)
-        ).all()
+        stmt = select(JobPosting.status, func.count(JobPosting.id))
+        if created_by_id is not None:
+            stmt = stmt.where(JobPosting.created_by_id == created_by_id)
+        rows = self.db.execute(stmt.group_by(JobPosting.status)).all()
         counts: Dict[JobStatus, int] = {s: 0 for s in JobStatus}
         for status, count in rows:
             counts[status] = int(count)

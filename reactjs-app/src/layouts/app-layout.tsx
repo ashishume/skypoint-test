@@ -10,6 +10,7 @@ const sideNav = [
   { to: "/hr", label: "Dashboard", icon: LayoutDashboard, enabled: true },
   { to: "/hr/jobs", label: "Active Searches", icon: Search, enabled: true },
   { to: "/hr/candidates", label: "Candidates", icon: UsersRound, enabled: true },
+  { to: "/hr/messages", label: "Messages", icon: Mail, enabled: true },
 ];
 
 const candidateSideNav = [

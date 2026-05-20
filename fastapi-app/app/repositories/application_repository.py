@@ -63,6 +63,7 @@ class ApplicationRepository(BaseRepository[Application]):
         self,
         *,
         job_id: int,
+        hr_user_id: int | None = None,
         limit: int,
         offset: int,
         status: Optional[ApplicationStatus] = None,
@@ -73,6 +74,8 @@ class ApplicationRepository(BaseRepository[Application]):
             .where(Application.job_id == job_id)
             .order_by(Application.created_at.desc(), Application.id.desc())
         )
+        if hr_user_id is not None:
+            stmt = stmt.join(Application.job).where(JobPosting.created_by_id == hr_user_id)
         if status is not None:
             stmt = stmt.where(Application.status == status)
         return self.paginate(stmt, limit=limit, offset=offset)
@@ -122,30 +125,34 @@ class ApplicationRepository(BaseRepository[Application]):
             )
         return self.paginate(stmt, limit=limit, offset=offset)
 
-    def status_counts(self) -> Dict[ApplicationStatus, int]:
+    def status_counts(self, *, hr_user_id: Optional[int] = None) -> Dict[ApplicationStatus, int]:
         """Return a dict mapping every ApplicationStatus to its count (0 if none)."""
-        rows = self.db.execute(
-            select(Application.status, func.count(Application.id))
-            .group_by(Application.status)
-        ).all()
+        stmt = select(Application.status, func.count(Application.id))
+        if hr_user_id is not None:
+            stmt = stmt.join(Application.job).where(JobPosting.created_by_id == hr_user_id)
+        rows = self.db.execute(stmt.group_by(Application.status)).all()
         counts: Dict[ApplicationStatus, int] = {s: 0 for s in ApplicationStatus}
         for status, count in rows:
             counts[status] = int(count)
         return counts
 
-    def recent(self, *, limit: int = 10) -> List[Application]:
+    def recent(self, *, limit: int = 10, hr_user_id: Optional[int] = None) -> List[Application]:
         stmt = (
             select(Application)
             .options(joinedload(Application.job), joinedload(Application.candidate))
             .order_by(Application.created_at.desc(), Application.id.desc())
-            .limit(limit)
         )
+        if hr_user_id is not None:
+            stmt = stmt.join(Application.job).where(JobPosting.created_by_id == hr_user_id)
+        stmt = stmt.limit(limit)
         return list(self.db.execute(stmt).scalars().all())
 
-    def created_at_since(self, since: datetime) -> List[datetime]:
+    def created_at_since(self, since: datetime, *, hr_user_id: Optional[int] = None) -> List[datetime]:
         stmt = (
             select(Application.created_at)
             .where(Application.created_at >= since)
             .order_by(Application.created_at.asc(), Application.id.asc())
         )
+        if hr_user_id is not None:
+            stmt = stmt.join(Application.job).where(JobPosting.created_by_id == hr_user_id)
         return list(self.db.execute(stmt).scalars().all())

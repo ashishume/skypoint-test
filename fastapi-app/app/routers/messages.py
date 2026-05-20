@@ -26,6 +26,32 @@ def send_candidate_message(
 
 
 @router.get(
+    "/hr",
+    response_model=list[MessageThreadResponse],
+    summary="List the current HR user's job message threads",
+)
+def list_hr_messages(
+    hr: HrUser,
+    service: MessageServiceDep,
+) -> list[MessageThreadResponse]:
+    return service.list_for_hr(hr)
+
+
+@router.post(
+    "/hr/{thread_id}/reply",
+    response_model=MessageThreadResponse,
+    summary="Reply to a message thread (HR only)",
+)
+def hr_reply_to_thread(
+    thread_id: int,
+    payload: MessageReplyCreate,
+    hr: HrUser,
+    service: MessageServiceDep,
+) -> MessageThreadResponse:
+    return service.reply_from_hr(thread_id, payload, hr)
+
+
+@router.get(
     "/candidate",
     response_model=list[MessageThreadResponse],
     summary="List the current candidate's job message threads",

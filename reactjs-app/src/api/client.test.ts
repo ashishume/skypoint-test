@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { api, applicationsApi, dashboardApi, getApiError, jobsApi } from "@/api/client";
+import { api, applicationsApi, dashboardApi, getApiError, jobsApi, messagesApi } from "@/api/client";
 
 describe("api client", () => {
   beforeEach(() => {
@@ -74,5 +74,22 @@ describe("api client", () => {
     });
     expect(patch).toHaveBeenCalledWith("/applications/1/status", { status: "shortlisted" });
     expect(get).toHaveBeenCalledWith("/hr/dashboard");
+  });
+
+  it("wraps message endpoints", async () => {
+    const get = vi.spyOn(api, "get").mockResolvedValue({ data: [] });
+    const post = vi.spyOn(api, "post").mockResolvedValue({ data: { id: 1 } });
+
+    await messagesApi.sendToCandidate({ candidate_id: 2, job_id: 3, body: "Hello" });
+    await messagesApi.hrThreads();
+    await messagesApi.hrReply(1, { body: "Following up" });
+    await messagesApi.candidateThreads();
+    await messagesApi.reply(1, { body: "Thanks" });
+
+    expect(post).toHaveBeenCalledWith("/messages/hr", { candidate_id: 2, job_id: 3, body: "Hello" });
+    expect(get).toHaveBeenCalledWith("/messages/hr");
+    expect(post).toHaveBeenCalledWith("/messages/hr/1/reply", { body: "Following up" });
+    expect(get).toHaveBeenCalledWith("/messages/candidate");
+    expect(post).toHaveBeenCalledWith("/messages/candidate/1/reply", { body: "Thanks" });
   });
 });

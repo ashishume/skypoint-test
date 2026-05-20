@@ -89,5 +89,5 @@ def update_application_status(
     hr: HrUser,
     service: ApplicationServiceDep,
 ) -> ApplicationResponse:
-    application = service.update_status(application_id, payload.status)
+    application = service.update_status(application_id, payload.status, hr)
     return ApplicationResponse.model_validate(application)

@@ -1,11 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArchiveX, Edit, Eye, FileText, LayoutGrid, List, MoreHorizontal, Plus, Search, Trash2, X } from "lucide-react";
+import { ArchiveX, Edit, Eye, FileText, LayoutGrid, List, MoreHorizontal, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { applicationsApi, getApiError, jobsApi } from "@/api/client";
 import { AlertDialog } from "@/components/ui/alert-dialog";
-import type { ApplicationStatus, ApplicationWithCandidateProfile, Job, JobPayload, JobStatus } from "@/api/types";
+import type { ApplicationStatus, ApplicationWithCandidateProfile, Job, JobPayload, JobStatus, JobType } from "@/api/types";
 import { EmptyState } from "@/components/common/empty-state";
 import { PaginationControls } from "@/components/common/pagination-controls";
 import { PageHeader } from "@/components/common/page-header";
@@ -25,7 +25,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -39,6 +38,7 @@ import { ApplicantsTable } from "@/features/jobs/applicants-table";
 import { CandidateProfileDialog } from "@/features/candidates/candidate-profile-dialog";
 import { JobForm } from "@/features/jobs/job-form";
 import { JobCard } from "@/features/jobs/job-card";
+import { JobSearchFilters, salaryRangeFilters } from "@/features/jobs/job-search-filters";
 import { applicationStatusLabels, formatCurrencyRange, formatDate, jobStatusLabels, jobTypeLabels } from "@/lib/format";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 
@@ -63,6 +63,10 @@ function parseJobStatus(value: string | null): JobStatus | undefined {
 export default function HrJobsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState(searchParams.get("search") ?? "");
+  const [locationFilter, setLocationFilter] = useState("");
+  const [skillFilter, setSkillFilter] = useState("");
+  const [jobTypeFilter, setJobTypeFilter] = useState<JobType | "all">("all");
+  const [salaryRangeFilter, setSalaryRangeFilter] = useState("any");
   const [editingJob, setEditingJob] = useState<Job | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [applicationsJob, setApplicationsJob] = useState<Job | null>(null);
@@ -74,6 +78,10 @@ export default function HrJobsPage() {
   const [applicationsPage, setApplicationsPage] = useState(1);
   const queryClient = useQueryClient();
   const debouncedSearch = useDebouncedValue(search.trim(), 350);
+  const debouncedLocation = useDebouncedValue(locationFilter.trim(), 350);
+  const debouncedSkill = useDebouncedValue(skillFilter.trim(), 350);
+  const debouncedJobType = useDebouncedValue(jobTypeFilter, 350);
+  const debouncedSalaryRange = useDebouncedValue(salaryRangeFilter, 350);
   const applicationStatusFilter = parseApplicationStatus(searchParams.get("applicationStatus"));
   const jobStatusFilter = parseJobStatus(searchParams.get("status"));
   const shouldOpenCreateDialog = searchParams.get("create") === "1";
@@ -86,17 +94,33 @@ export default function HrJobsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, jobStatusFilter]);
+  }, [debouncedSearch, debouncedLocation, debouncedSkill, debouncedJobType, debouncedSalaryRange, jobStatusFilter]);
 
   useEffect(() => {
     setApplicationsPage(1);
   }, [applicationsJob?.id, applicationStatusFilter]);
 
+  const salary = salaryRangeFilters[debouncedSalaryRange] ?? salaryRangeFilters.any;
   const jobsQuery = useQuery({
-    queryKey: ["jobs", "hr", debouncedSearch, jobStatusFilter, page],
+    queryKey: [
+      "jobs",
+      "hr",
+      debouncedSearch,
+      debouncedLocation,
+      debouncedSkill,
+      debouncedJobType,
+      debouncedSalaryRange,
+      jobStatusFilter,
+      page,
+    ],
     queryFn: () =>
       jobsApi.list({
         search: debouncedSearch || undefined,
+        location: debouncedLocation || undefined,
+        skill: debouncedSkill || undefined,
+        job_type: debouncedJobType === "all" ? undefined : debouncedJobType,
+        salary_min: salary.min,
+        salary_max: salary.max,
         status: jobStatusFilter,
         limit: JOBS_PAGE_SIZE,
         offset: (page - 1) * JOBS_PAGE_SIZE,
@@ -208,14 +232,24 @@ export default function HrJobsPage() {
   }
 
   const activeFilterLabel = useMemo(() => {
+    const filterParts = [
+      debouncedSearch && "keyword",
+      debouncedLocation && "location",
+      debouncedSkill && "skill",
+      debouncedJobType !== "all" && "job type",
+      debouncedSalaryRange !== "any" && "salary",
+    ].filter(Boolean);
     if (applicationStatusFilter) {
       return `${applicationStatusLabels[applicationStatusFilter]} applicants`;
     }
     if (jobStatusFilter) {
       return `${jobStatusLabels[jobStatusFilter]} jobs`;
     }
+    if (filterParts.length) {
+      return `${filterParts.join(", ")} filters`;
+    }
     return null;
-  }, [applicationStatusFilter, jobStatusFilter]);
+  }, [applicationStatusFilter, debouncedJobType, debouncedLocation, debouncedSalaryRange, debouncedSearch, debouncedSkill, jobStatusFilter]);
 
   return (
     <>
@@ -231,16 +265,19 @@ export default function HrJobsPage() {
         }
       />
       <section className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+        <JobSearchFilters
+          keyword={search}
+          location={locationFilter}
+          skill={skillFilter}
+          jobType={jobTypeFilter}
+          salaryRange={salaryRangeFilter}
+          onKeywordChange={setSearch}
+          onLocationChange={setLocationFilter}
+          onSkillChange={setSkillFilter}
+          onJobTypeChange={setJobTypeFilter}
+          onSalaryRangeChange={setSalaryRangeFilter}
+        />
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="relative max-w-xl flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search jobs"
-              className="pl-9"
-            />
-          </div>
           <Select
             value={jobStatusFilter ?? "all"}
             onValueChange={(value) => updateParams({ status: value === "all" ? null : value, page: null })}
@@ -288,7 +325,14 @@ export default function HrJobsPage() {
               type="button"
               variant="ghost"
               size="sm"
-              onClick={() => updateParams({ status: null, applicationStatus: null, jobId: null, page: null })}
+              onClick={() => {
+                setSearch("");
+                setLocationFilter("");
+                setSkillFilter("");
+                setJobTypeFilter("all");
+                setSalaryRangeFilter("any");
+                updateParams({ status: null, applicationStatus: null, jobId: null, page: null });
+              }}
               className="text-blue-900 hover:bg-blue-100"
             >
               <X className="h-4 w-4" />

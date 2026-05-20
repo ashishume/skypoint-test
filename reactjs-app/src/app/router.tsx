@@ -15,6 +15,7 @@ const HrDashboardPage = lazy(() => import("@/pages/hr-dashboard-page"));
 const HrCandidatesPage = lazy(() => import("@/pages/hr-candidates-page"));
 const HrJobDetailsPage = lazy(() => import("@/pages/hr-job-details-page"));
 const HrJobsPage = lazy(() => import("@/pages/hr-jobs-page"));
+const HrMessagesPage = lazy(() => import("@/pages/hr-messages-page"));
 
 function PageLoader() {
   return (
@@ -67,6 +68,7 @@ export function AppRouter() {
             <Route path="/hr/jobs" element={<HrJobsPage />} />
             <Route path="/hr/jobs/:jobId" element={<HrJobDetailsPage />} />
             <Route path="/hr/candidates" element={<HrCandidatesPage />} />
+            <Route path="/hr/messages" element={<HrMessagesPage />} />
           </Route>
         </Route>
         <Route path="*" element={<RootRedirect />} />

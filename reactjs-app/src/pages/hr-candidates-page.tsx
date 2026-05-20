@@ -3,7 +3,7 @@ import { LayoutGrid, List, Search, UsersRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { applicationsApi, getApiError } from "@/api/client";
+import { applicationsApi, getApiError, jobsApi } from "@/api/client";
 import type { ApplicationStatus, ApplicationWithCandidateProfile } from "@/api/types";
 import { EmptyState } from "@/components/common/empty-state";
 import { PageHeader } from "@/components/common/page-header";
@@ -32,6 +32,7 @@ const applicationStatuses = Object.keys(applicationStatusLabels) as ApplicationS
 export default function HrCandidatesPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<ApplicationStatus | "all">("all");
+  const [jobFilter, setJobFilter] = useState("all");
   const [page, setPage] = useState(1);
   const [selectedApplication, setSelectedApplication] = useState<ApplicationWithCandidateProfile | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
@@ -42,14 +43,20 @@ export default function HrCandidatesPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, statusFilter]);
+  }, [debouncedSearch, statusFilter, jobFilter]);
+
+  const jobsQuery = useQuery({
+    queryKey: ["jobs", "hr", "candidate-filter"],
+    queryFn: () => jobsApi.list({ limit: 100 }),
+  });
 
   const candidatesQuery = useQuery({
-    queryKey: ["applications", "hr-candidates", debouncedSearch, statusFilter, page],
+    queryKey: ["applications", "hr-candidates", debouncedSearch, statusFilter, jobFilter, page],
     queryFn: () =>
       applicationsApi.hrList({
         search: debouncedSearch || undefined,
         status: statusFilter === "all" ? undefined : statusFilter,
+        job_id: jobFilter === "all" ? undefined : Number(jobFilter),
         limit: CANDIDATES_PAGE_SIZE,
         offset: (page - 1) * CANDIDATES_PAGE_SIZE,
       }),
@@ -129,6 +136,25 @@ export default function HrCandidatesPage() {
               {applicationStatuses.map((status) => (
                 <SelectItem key={status} value={status}>
                   {applicationStatusLabels[status]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={jobFilter}
+            onValueChange={(value) => {
+              setJobFilter(value);
+              if (routedApplicationId) closeApplicationDialog();
+            }}
+          >
+            <SelectTrigger className="w-full lg:w-56">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All jobs</SelectItem>
+              {(jobsQuery.data?.items ?? []).map((job) => (
+                <SelectItem key={job.id} value={String(job.id)}>
+                  {job.title}
                 </SelectItem>
               ))}
             </SelectContent>

@@ -16,4 +16,4 @@ def hr_dashboard(
     hr: HrUser,
     service: ApplicationServiceDep,
 ) -> HrDashboardResponse:
-    return service.hr_dashboard()
+    return service.hr_dashboard(hr)

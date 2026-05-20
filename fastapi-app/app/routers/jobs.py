@@ -53,11 +53,13 @@ def list_jobs(
     salary_max: Annotated[Optional[int], Query(ge=0, le=10_000_000)] = None,
 ) -> Page[JobResponse]:
     effective_status = status_filter
+    created_by_id = current_user.id if current_user.role == UserRole.HR else None
     if current_user.role == UserRole.CANDIDATE:
         # Candidates can never see closed jobs.
         effective_status = JobStatus.OPEN
     return service.list(
         pagination,
+        created_by_id=created_by_id,
         status=effective_status,
         location=location,
         job_type=job_type,
@@ -81,7 +83,7 @@ def get_job(
     if current_user.role == UserRole.CANDIDATE:
         job = service.get_for_candidate(job_id)
     else:
-        job = service.get(job_id)
+        job = service.get_for_hr(job_id, current_user)
     return JobResponse.model_validate(job)
 
 
@@ -96,7 +98,7 @@ def update_job(
     hr: HrUser,
     service: JobServiceDep,
 ) -> JobResponse:
-    job = service.update(job_id, payload)
+    job = service.update(job_id, payload, hr)
     return JobResponse.model_validate(job)
 
 
@@ -110,7 +112,7 @@ def delete_job(
     hr: HrUser,
     service: JobServiceDep,
 ) -> None:
-    service.delete(job_id)
+    service.delete(job_id, hr)
 
 
 @router.get(
@@ -125,4 +127,4 @@ def list_job_applications(
     pagination: Annotated[PaginationParams, Depends()],
     status_filter: Annotated[Optional[ApplicationStatus], Query(alias="status")] = None,
 ) -> Page[ApplicationWithCandidateProfile]:
-    return service.list_for_job(job_id, pagination, status=status_filter)
+    return service.list_for_job(job_id, hr, pagination, status=status_filter)

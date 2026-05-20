@@ -52,6 +52,28 @@ class MessageService:
             for thread in self.message_repo.list_for_candidate(candidate_id=candidate.id)
         ]
 
+    def list_for_hr(self, hr: User) -> list[MessageThreadResponse]:
+        return [
+            MessageThreadResponse.model_validate(thread)
+            for thread in self.message_repo.list_for_hr(hr_id=hr.id)
+        ]
+
+    def reply_from_hr(
+        self, thread_id: int, payload: MessageReplyCreate, hr: User
+    ) -> MessageThreadResponse:
+        body = payload.body.strip()
+        if not body:
+            raise BadRequestError("Message body cannot be empty.")
+
+        thread = self.message_repo.get_with_details(thread_id)
+        if thread is None:
+            raise NotFoundError(f"Message thread with id {thread_id} not found.")
+        if thread.hr_id != hr.id:
+            raise ForbiddenError("You can only reply to your own message threads.")
+
+        self.message_repo.add_message(thread=thread, sender_id=hr.id, body=body)
+        return self._response(thread.id)
+
     def reply_from_candidate(
         self, thread_id: int, payload: MessageReplyCreate, candidate: User
     ) -> MessageThreadResponse:

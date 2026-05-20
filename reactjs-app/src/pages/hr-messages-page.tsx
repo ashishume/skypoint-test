@@ -10,27 +10,27 @@ import { PageHeader } from "@/components/common/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MessageThreadCard } from "@/features/messages/message-thread-card";
 
-export default function CandidateMessagesPage() {
+export default function HrMessagesPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [drafts, setDrafts] = useState<Record<number, string>>({});
 
   const messagesQuery = useQuery({
-    queryKey: ["messages", "candidate"],
-    queryFn: messagesApi.candidateThreads,
+    queryKey: ["messages", "hr"],
+    queryFn: messagesApi.hrThreads,
   });
 
   const replyMutation = useMutation({
     mutationFn: ({ threadId, body }: { threadId: number; body: string }) =>
-      messagesApi.reply(threadId, { body }),
+      messagesApi.hrReply(threadId, { body }),
     onSuccess: async (updatedThread, variables) => {
       toast.success("Reply sent");
       setDrafts((current) => ({ ...current, [variables.threadId]: "" }));
-      queryClient.setQueryData<MessageThread[]>(["messages", "candidate"], (current) => {
+      queryClient.setQueryData<MessageThread[]>(["messages", "hr"], (current) => {
         if (!current) return [updatedThread];
         return current.map((thread) => (thread.id === updatedThread.id ? updatedThread : thread));
       });
-      await queryClient.refetchQueries({ queryKey: ["messages", "candidate"], type: "active" });
+      await queryClient.refetchQueries({ queryKey: ["messages", "hr"], type: "active" });
     },
     onError: (error) => toast.error(getApiError(error)),
   });
@@ -47,9 +47,9 @@ export default function CandidateMessagesPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Recruiter messages"
+        eyebrow="Candidate conversations"
         title="Messages"
-        description="See recruiter outreach tied to your applications and reply when needed."
+        description="Read candidate replies and continue conversations tied to your own jobs."
       />
       <section className="space-y-4 px-4 py-6 sm:px-6 lg:px-8">
         {messagesQuery.isLoading ? (
@@ -62,8 +62,8 @@ export default function CandidateMessagesPage() {
               currentUserId={user?.id}
               draft={drafts[thread.id] ?? ""}
               isSending={replyMutation.isPending}
-              jobHref={`/candidate/jobs/${thread.job.id}`}
-              replyPlaceholder="Write a reply to the recruiter"
+              jobHref={`/hr/jobs/${thread.job.id}`}
+              replyPlaceholder="Write a reply to the candidate"
               onDraftChange={(value) => setDrafts((current) => ({ ...current, [thread.id]: value }))}
               onReply={() => sendReply(thread.id)}
             />
@@ -71,8 +71,8 @@ export default function CandidateMessagesPage() {
         ) : (
           <EmptyState
             icon={Mail}
-            title="No messages yet"
-            description="When a recruiter contacts you about an application, the conversation will appear here."
+            title="No conversations yet"
+            description="Messages you send from candidate profiles will appear here when candidates reply."
           />
         )}
       </section>

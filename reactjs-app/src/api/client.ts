@@ -183,6 +183,14 @@ export const messagesApi = {
     const { data } = await api.post<MessageThread>("/messages/hr", payload);
     return data;
   },
+  hrThreads: async () => {
+    const { data } = await api.get<MessageThread[]>("/messages/hr");
+    return data;
+  },
+  hrReply: async (threadId: number, payload: { body: string }) => {
+    const { data } = await api.post<MessageThread>(`/messages/hr/${threadId}/reply`, payload);
+    return data;
+  },
   candidateThreads: async () => {
     const { data } = await api.get<MessageThread[]>("/messages/candidate");
     return data;

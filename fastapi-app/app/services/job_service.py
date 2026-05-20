@@ -1,7 +1,7 @@
 """Job posting business logic: CRUD + listing for HR / candidates."""
 from typing import Optional
 
-from app.core.exceptions import NotFoundError
+from app.core.exceptions import BadRequestError, ForbiddenError, NotFoundError
 from app.core.pagination import Page, PaginationParams
 from app.models.job import JobPosting, JobStatus, JobType
 from app.models.user import User
@@ -30,6 +30,12 @@ class JobService:
     def get(self, job_id: int) -> JobPosting:
         return self.job_repo.get_or_404(job_id, resource_name="Job posting")
 
+    def get_for_hr(self, job_id: int, hr_user: User) -> JobPosting:
+        job = self.get(job_id)
+        if job.created_by_id != hr_user.id:
+            raise ForbiddenError("You can only access your own job postings.")
+        return job
+
     def get_for_candidate(self, job_id: int) -> JobPosting:
         """Candidates can only see open jobs; closed ones return 404."""
         job = self.get(job_id)
@@ -41,6 +47,7 @@ class JobService:
         self,
         pagination: PaginationParams,
         *,
+        created_by_id: Optional[int] = None,
         status: Optional[JobStatus] = None,
         location: Optional[str] = None,
         job_type: Optional[JobType] = None,
@@ -52,6 +59,7 @@ class JobService:
         items, total = self.job_repo.list_jobs(
             limit=pagination.limit,
             offset=pagination.offset,
+            created_by_id=created_by_id,
             status=status,
             location=location,
             job_type=job_type,
@@ -66,9 +74,17 @@ class JobService:
             params=pagination,
         )
 
-    def update(self, job_id: int, payload: JobUpdate) -> JobPosting:
-        job = self.get(job_id)
+    def update(self, job_id: int, payload: JobUpdate, hr_user: User) -> JobPosting:
+        job = self.get_for_hr(job_id, hr_user)
         data = payload.model_dump(exclude_unset=True)
+        next_salary_min = data.get("salary_min", job.salary_min)
+        next_salary_max = data.get("salary_max", job.salary_max)
+        if (
+            next_salary_min is not None
+            and next_salary_max is not None
+            and next_salary_max < next_salary_min
+        ):
+            raise BadRequestError("salary_max must be greater than or equal to salary_min")
         for field, value in data.items():
             if field == "skills" and isinstance(value, list):
                 value = list(value)
@@ -77,6 +93,6 @@ class JobService:
             setattr(job, field, value)
         return self.job_repo.save(job)
 
-    def delete(self, job_id: int) -> None:
-        job = self.get(job_id)
+    def delete(self, job_id: int, hr_user: User) -> None:
+        job = self.get_for_hr(job_id, hr_user)
         self.job_repo.delete(job)

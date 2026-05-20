@@ -2,7 +2,7 @@
 from datetime import datetime, time, timedelta, timezone
 from typing import Optional
 
-from app.core.exceptions import BadRequestError, ConflictError
+from app.core.exceptions import BadRequestError, ConflictError, ForbiddenError
 from app.core.pagination import Page, PaginationParams
 from app.models.application import Application, ApplicationStatus
 from app.models.candidate_profile import CandidateProfile
@@ -89,14 +89,18 @@ class ApplicationService:
     def list_for_job(
         self,
         job_id: int,
+        hr: User,
         pagination: PaginationParams,
         *,
         status: Optional[ApplicationStatus] = None,
     ) -> Page[ApplicationWithCandidateProfile]:
         # Surface a 404 if the job itself doesn't exist (consistent error response).
-        self.job_repo.get_or_404(job_id, resource_name="Job posting")
+        job = self.job_repo.get_or_404(job_id, resource_name="Job posting")
+        if job.created_by_id != hr.id:
+            raise ForbiddenError("You can only view applicants for your own jobs.")
         items, total = self.application_repo.list_for_job(
             job_id=job_id,
+            hr_user_id=hr.id,
             limit=pagination.limit,
             offset=pagination.offset,
             status=status,
@@ -131,20 +135,22 @@ class ApplicationService:
         )
 
     def update_status(
-        self, application_id: int, new_status: ApplicationStatus
+        self, application_id: int, new_status: ApplicationStatus, hr: User
     ) -> Application:
         application = self.get(application_id)
+        if application.job.created_by_id != hr.id:
+            raise ForbiddenError("You can only update applications for your own jobs.")
         if application.status == new_status:
             return application
         application.status = new_status
         return self.application_repo.save(application)
 
-    def hr_dashboard(self) -> HrDashboardResponse:
-        job_counts = self.job_repo.status_counts()
-        app_counts = self.application_repo.status_counts()
+    def hr_dashboard(self, hr: User) -> HrDashboardResponse:
+        job_counts = self.job_repo.status_counts(created_by_id=hr.id)
+        app_counts = self.application_repo.status_counts(hr_user_id=hr.id)
         total_jobs = sum(job_counts.values())
         total_apps = sum(app_counts.values())
-        hiring_velocity = self._hiring_velocity()
+        hiring_velocity = self._hiring_velocity(hr)
 
         return HrDashboardResponse(
             total_jobs=total_jobs,
@@ -161,19 +167,19 @@ class ApplicationService:
             ),
             recent_applications=[
                 ApplicationWithJobAndCandidate.model_validate(a)
-                for a in self.application_repo.recent(limit=10)
+                for a in self.application_repo.recent(limit=10, hr_user_id=hr.id)
             ],
             hiring_velocity=hiring_velocity,
         )
 
-    def _hiring_velocity(self) -> HiringVelocity:
+    def _hiring_velocity(self, hr: User) -> HiringVelocity:
         window_days = 30
         today = datetime.now(timezone.utc).date()
         start_date = today - timedelta(days=window_days - 1)
         since = datetime.combine(start_date, time.min, tzinfo=timezone.utc)
         created_dates = [
             created_at.date()
-            for created_at in self.application_repo.created_at_since(since)
+            for created_at in self.application_repo.created_at_since(since, hr_user_id=hr.id)
         ]
 
         bucket_spans = [9, 7, 7, 7]
