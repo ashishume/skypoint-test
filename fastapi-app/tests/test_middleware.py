@@ -24,6 +24,15 @@ def test_request_id_header_is_preserved(client):
     assert response.headers["X-Request-ID"] == "assessment-request"
 
 
+def test_docs_csp_allows_swagger_assets(client):
+    response = client.get("/api/v1/docs")
+
+    assert response.status_code == 200
+    csp = response.headers["Content-Security-Policy"]
+    assert "https://cdn.jsdelivr.net" in csp
+    assert "'unsafe-inline'" in csp
+
+
 def test_auth_rate_limiter_returns_retry_after():
     middleware = AuthRateLimitMiddleware(
         app=lambda scope, receive, send: None,

@@ -37,16 +37,31 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers.setdefault("X-Frame-Options", "DENY")
         response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
         response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
-        response.headers.setdefault(
-            "Content-Security-Policy",
-            "default-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'",
-        )
+        response.headers.setdefault("Content-Security-Policy", self._content_security_policy(request))
         if settings.APP_ENV.lower() == "production":
             response.headers.setdefault(
                 "Strict-Transport-Security",
                 "max-age=31536000; includeSubDomains",
             )
         return response
+
+    @staticmethod
+    def _content_security_policy(request: Request) -> str:
+        docs_paths = {
+            f"{settings.API_V1_PREFIX}/docs",
+            f"{settings.API_V1_PREFIX}/redoc",
+        }
+        if request.url.path in docs_paths:
+            return (
+                "default-src 'self'; "
+                "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                "img-src 'self' data: https://fastapi.tiangolo.com; "
+                "font-src 'self' data: https://cdn.jsdelivr.net; "
+                "connect-src 'self'; "
+                "frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
+            )
+        return "default-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
 
 
 class AuthRateLimitMiddleware(BaseHTTPMiddleware):
