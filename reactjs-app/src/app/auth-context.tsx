@@ -8,14 +8,14 @@ import {
   type ReactNode,
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { authApi, tokenStorage } from "@/api/client";
-import type { TokenResponse, User, UserRole } from "@/api/types";
+import { authApi } from "@/api/client";
+import type { User, UserRole } from "@/api/types";
 
 interface AuthContextValue {
   user: User | null;
   isBootstrapping: boolean;
   isAuthenticated: boolean;
-  setSession: (session: TokenResponse) => void;
+  setSession: (user: User) => void;
   setRegisteredUser: (user: User) => void;
   logout: () => void;
   hasRole: (role: UserRole) => boolean;
@@ -31,16 +31,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let ignore = false;
     async function restoreSession() {
-      const token = tokenStorage.get();
-      if (!token) {
-        setIsBootstrapping(false);
-        return;
-      }
       try {
         const currentUser = await authApi.me();
         if (!ignore) setUser(currentUser);
       } catch {
-        tokenStorage.clear();
+        // No valid session cookie — user stays logged out.
       } finally {
         if (!ignore) setIsBootstrapping(false);
       }
@@ -51,9 +46,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const setSession = useCallback((session: TokenResponse) => {
-    tokenStorage.set(session.access_token);
-    setUser(session.user);
+  const setSession = useCallback((loggedInUser: User) => {
+    setUser(loggedInUser);
   }, []);
 
   const setRegisteredUser = useCallback((registeredUser: User) => {
@@ -61,7 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
-    tokenStorage.clear();
+    authApi.logout().catch(() => {});
     setUser(null);
     queryClient.clear();
   }, [queryClient]);

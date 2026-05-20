@@ -42,6 +42,10 @@ class Settings(BaseSettings):
 
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:80"
 
+    COOKIE_NAME: str = "access_token"
+    COOKIE_SECURE: bool = False
+    COOKIE_SAMESITE: str = "lax"
+
     RATE_LIMIT_AUTH_MAX_REQUESTS: int = Field(default=20, ge=1, le=10_000)
     RATE_LIMIT_AUTH_WINDOW_SECONDS: int = Field(default=60, ge=1, le=3600)
 

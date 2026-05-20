@@ -8,8 +8,7 @@ The `*Dep` aliases (Annotated[X, Depends(...)]) let routers write
 """
 from typing import Annotated, Optional
 
-from fastapi import Depends, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import Depends, Request, status
 from jose import JWTError
 from sqlalchemy.orm import Session
 
@@ -32,11 +31,16 @@ from app.services.user_service import UserService
 
 DbSession = Annotated[Session, Depends(get_db)]
 
-oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl=f"{settings.API_V1_PREFIX}/auth/login",
-    auto_error=False,
-)
-TokenStr = Annotated[Optional[str], Depends(oauth2_scheme)]
+
+def _extract_token(request: Request) -> Optional[str]:
+    """Read JWT from Bearer header first; fall back to HttpOnly cookie for browser clients."""
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        return auth_header[7:]
+    return request.cookies.get(settings.COOKIE_NAME)
+
+
+TokenStr = Annotated[Optional[str], Depends(_extract_token)]
 
 
 def get_user_repository(db: DbSession) -> UserRepository:
@@ -119,7 +123,7 @@ MessageServiceDep = Annotated[MessageService, Depends(get_message_service)]
 
 def get_current_user(
     user_repo: UserRepoDep,
-    token: TokenStr = None,
+    token: TokenStr,
 ) -> User:
     """Resolve the authenticated user from a Bearer JWT.
 

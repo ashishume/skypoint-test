@@ -20,48 +20,14 @@ import type {
   UserRole,
 } from "@/api/types";
 
-const TOKEN_KEY = "recruitflow_access_token";
-
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "/api/v1",
   timeout: 10_000,
+  withCredentials: true,
   headers: {
     "Content-Type": "application/json",
   },
 });
-
-api.interceptors.request.use((config) => {
-  const token = tokenStorage.get();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
-export const tokenStorage = {
-  get: () => {
-    try {
-      return window.localStorage?.getItem(TOKEN_KEY) ?? null;
-    } catch {
-      return null;
-    }
-  },
-  set: (token: string) => {
-    try {
-      window.localStorage?.setItem(TOKEN_KEY, token);
-    } catch {
-      // Browsers with disabled storage still allow the UI to render; the
-      // session simply will not persist after reload.
-    }
-  },
-  clear: () => {
-    try {
-      window.localStorage?.removeItem(TOKEN_KEY);
-    } catch {
-      // No-op when storage is disabled.
-    }
-  },
-};
 
 export function getApiError(error: unknown): string {
   if (axios.isAxiosError<ApiErrorPayload>(error)) {
@@ -99,6 +65,9 @@ export const authApi = {
   me: async () => {
     const { data } = await api.get<User>("/auth/me");
     return data;
+  },
+  logout: async () => {
+    await api.post("/auth/logout");
   },
 };
 

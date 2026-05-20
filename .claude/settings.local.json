@@ -18,7 +18,9 @@
       "Bash(grep -rnE \"\\(secret|password|key|invite\\)\\\\s*=\\\\s*['\\\\\"][A-Za-z0-9@!#\\\\$%^&*_\\\\-]{8,}['\\\\\"]\" app/ --include=\"*.py\")",
       "Bash(python -m pytest tests/ -x --tb=short)",
       "Bash(python3 -m pytest tests/ -x --tb=short)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Bash(docker compose *)"
     ]
   }
 }

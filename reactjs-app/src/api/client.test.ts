@@ -1,69 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { api, applicationsApi, dashboardApi, getApiError, jobsApi, tokenStorage } from "@/api/client";
-
-function installLocalStorage() {
-  const store = new Map<string, string>();
-  const storage = {
-    getItem: vi.fn((key: string) => store.get(key) ?? null),
-    setItem: vi.fn((key: string, value: string) => {
-      store.set(key, value);
-    }),
-    removeItem: vi.fn((key: string) => {
-      store.delete(key);
-    }),
-    clear: vi.fn(() => {
-      store.clear();
-    }),
-  };
-  Object.defineProperty(window, "localStorage", {
-    configurable: true,
-    value: storage,
-  });
-  return storage;
-}
-
-describe("tokenStorage", () => {
-  beforeEach(() => {
-    installLocalStorage();
-  });
-
-  it("persists and clears the auth token", () => {
-    tokenStorage.set("abc123");
-    expect(tokenStorage.get()).toBe("abc123");
-
-    tokenStorage.clear();
-    expect(tokenStorage.get()).toBeNull();
-  });
-
-  it("does not throw when localStorage is unavailable", () => {
-    const storage = installLocalStorage();
-    storage.getItem.mockImplementation(() => {
-      throw new Error("disabled");
-    });
-
-    expect(tokenStorage.get()).toBeNull();
-    expect(() => tokenStorage.set("abc123")).not.toThrow();
-    expect(() => tokenStorage.clear()).not.toThrow();
-  });
-});
+import { api, applicationsApi, dashboardApi, getApiError, jobsApi } from "@/api/client";
 
 describe("api client", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
-    installLocalStorage();
   });
 
-  it("adds bearer token to outgoing requests", async () => {
-    tokenStorage.set("token-value");
-
-    const handlers = api.interceptors.request.handlers as unknown as Array<{
-      fulfilled?: (config: { headers: Record<string, string> }) => { headers: Record<string, string> };
-    }>;
-    const config = await handlers[0].fulfilled?.({
-      headers: {},
-    });
-
-    expect(config?.headers.Authorization).toBe("Bearer token-value");
+  it("sends credentials (cookies) with every request", () => {
+    expect(api.defaults.withCredentials).toBe(true);
   });
 
   it("normalizes backend error payloads", () => {

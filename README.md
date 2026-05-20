@@ -62,6 +62,7 @@ Code review performed against typical production checklists. All items below wer
 | `SECRET_KEY` required from env (≥32 chars, fail-fast) | ✅ | `Field(..., min_length=32)` |
 | Passwords hashed with bcrypt (configurable cost ≥4, default 12) | ✅ | `app/core/security.py` |
 | Timing-safe authentication | ✅ | `consume_dummy_hash()` invoked on unknown-email path |
+| JWT issued as `HttpOnly` cookie; JS cannot read the token | ✅ | `POST /auth/login` sets `Set-Cookie: access_token=...; HttpOnly; SameSite=Lax`; Bearer header accepted as fallback for Swagger / API clients |
 | JWT signed with HS256/384/512 + `type=access` claim enforced | ✅ | `app/dependencies.py` rejects wrong-type, expired, non-integer-sub, deleted-user, and deactivated-user tokens |
 | Role-based access control (HR / Candidate) | ✅ | `require_hr`, `require_candidate` guards on every protected route |
 | SQL injection protection | ✅ | All queries use SQLAlchemy ORM / parameterised expressions |
@@ -298,8 +299,9 @@ All `/jobs`, `/applications`, `/hr/*`, `/candidate/*`, and `/messages/*` endpoin
 | Method | Path | Role | Description |
 |---|---|---|---|
 | POST | `/api/v1/auth/register` | public | Register a user; HR needs `hr_invite_code` |
-| POST | `/api/v1/auth/login` | public | Exchange credentials for a JWT |
-| GET | `/api/v1/auth/me` | any | Return the authenticated user |
+| POST | `/api/v1/auth/login` | public | Exchange credentials for an `HttpOnly` session cookie (token also returned in body for Swagger) |
+| POST | `/api/v1/auth/logout` | any | Clear the session cookie |
+| GET | `/api/v1/auth/me` | any | Return the currently authenticated user |
 
 ### Jobs
 
@@ -595,7 +597,7 @@ Sign in at `http://localhost:5173/auth`, then use the Candidate navigation.
 | Decision | Why it was made | Production path |
 |---|---|---|
 | **In-memory rate limiter** | Zero extra dependencies; sufficient for a single-instance assessment environment. | Replace with a Redis-backed store (e.g. `slowapi` + Redis) so limits are shared across all uvicorn workers and survive restarts. |
-| **JWT stored in `localStorage`** | Simple to implement; no cookie/CSRF machinery needed for the assessment scope. | Move to `HttpOnly` + `Secure` cookies to eliminate XSS token-theft risk; add CSRF protection (double-submit or `SameSite=Strict`). |
+| **`SameSite=Lax` CSRF posture** | `SameSite=Lax` blocks cross-site POST requests and is sufficient for a same-domain deployment. | Switch to `SameSite=Strict` or add an explicit CSRF token (double-submit cookie) if the frontend is ever served from a different origin. |
 | **Synchronous recommendation algorithm** | Avoids a background-task dependency (Celery/RQ) while still demonstrating the skill-matching logic. | Offload to an async worker so the HTTP response time is not coupled to recommendation computation; add a dedicated recommendations table for caching results. |
 | **Skills as JSON column** | Keeps the schema simple and avoids a join table for this scale. | Normalise into a `skills` lookup table + `job_skills` / `candidate_skills` join tables, and switch the column type to JSONB (PostgreSQL) for GIN-indexed containment queries. |
 | **Pull-based messaging** | No WebSocket dependency required for this scope. | Add a WebSocket or SSE channel so candidates are notified of new messages in real time. |

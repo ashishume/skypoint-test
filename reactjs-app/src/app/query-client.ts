@@ -1,5 +1,5 @@
 import { QueryClient } from "@tanstack/react-query";
-import { isUnauthorized, tokenStorage } from "@/api/client";
+import { isUnauthorized } from "@/api/client";
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -7,7 +7,6 @@ export const queryClient = new QueryClient({
       staleTime: 30_000,
       retry: (failureCount, error) => {
         if (isUnauthorized(error)) {
-          tokenStorage.clear();
           return false;
         }
         return failureCount < 1;

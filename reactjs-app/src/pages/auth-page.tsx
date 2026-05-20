@@ -75,7 +75,7 @@ export default function AuthPage() {
         email,
         password,
       });
-      setSession(session);
+      setSession(session.user);
       const fallback = session.user.role === "hr" ? "/hr" : "/candidate/jobs";
       const target = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname || fallback;
       navigate(target, { replace: true });

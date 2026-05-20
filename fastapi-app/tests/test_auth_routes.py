@@ -9,6 +9,7 @@ from app.core.security import create_access_token, decode_access_token
 
 REGISTER = "/api/v1/auth/register"
 LOGIN = "/api/v1/auth/login"
+LOGOUT = "/api/v1/auth/logout"
 ME = "/api/v1/auth/me"
 
 
@@ -180,6 +181,10 @@ class TestLogin:
         assert data["user"]["email"] == "candidate@test.com"
         assert data["user"]["role"] == "candidate"
         assert "access_token" in data
+        # Cookie must be set HttpOnly so JS cannot read it
+        cookie_header = res.headers.get("set-cookie", "")
+        assert "access_token=" in cookie_header
+        assert "HttpOnly" in cookie_header
 
     def test_login_returns_valid_jwt(self, client, candidate_user):
         res = client.post(LOGIN, json={
@@ -234,6 +239,23 @@ class TestLogin:
         assert res.status_code == 422
 
 
+class TestLogout:
+    def test_logout_clears_cookie(self, client, candidate_user):
+        client.post(LOGIN, json={"email": "candidate@test.com", "password": "Candidate@123"})
+        res = client.post(LOGOUT)
+        assert res.status_code == 204
+        # After logout the cookie should be expired / cleared
+        cookie_header = res.headers.get("set-cookie", "")
+        assert "access_token=" in cookie_header
+
+    def test_me_via_cookie(self, client, candidate_user):
+        """After login the session cookie alone should authenticate /me."""
+        client.post(LOGIN, json={"email": "candidate@test.com", "password": "Candidate@123"})
+        res = client.get(ME)  # no Authorization header — relies on cookie
+        assert res.status_code == 200
+        assert res.json()["email"] == "candidate@test.com"
+
+
 class TestMe:
     def test_me_success(self, client, candidate_user, candidate_token):
         res = client.get(ME, headers={"Authorization": f"Bearer {candidate_token}"})
@@ -251,12 +273,15 @@ class TestMe:
         res = client.get(ME, headers={"Authorization": "Bearer not.a.real.jwt"})
         assert res.status_code == 401
 
-    def test_me_missing_bearer_prefix(self, client, candidate_token):
-        res = client.get(ME, headers={"Authorization": candidate_token})
+    def test_me_missing_bearer_prefix(self, client, candidate_user):
+        # Create token without triggering login (no cookie set) to isolate header validation.
+        token = create_access_token(subject=candidate_user.id)
+        res = client.get(ME, headers={"Authorization": token})
         assert res.status_code == 401
 
-    def test_me_wrong_scheme(self, client, candidate_token):
-        res = client.get(ME, headers={"Authorization": f"Basic {candidate_token}"})
+    def test_me_wrong_scheme(self, client, candidate_user):
+        token = create_access_token(subject=candidate_user.id)
+        res = client.get(ME, headers={"Authorization": f"Basic {token}"})
         assert res.status_code == 401
 
     def test_me_expired_token(self, client, candidate_user):
