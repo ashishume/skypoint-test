@@ -17,11 +17,12 @@ http://localhost:5173
   v
 FastAPI backend
 http://localhost:8000
-  |
-  | SQLAlchemy + Alembic migrations
-  v
-PostgreSQL 16
-named Docker volume: recruitflow_postgres_data
+  |                         |
+  | SQLAlchemy + Alembic    | auth rate-limit counters
+  v                         v
+PostgreSQL 16              Redis 7
+volume: recruitflow_postgres_data
+volume: recruitflow_redis_data
 ```
 
 Backend code follows a layered structure:
@@ -57,6 +58,7 @@ Open:
 No manual environment setup is required for assessment. Docker Compose includes development defaults and starts:
 
 - `db`: PostgreSQL 16
+- `redis`: Redis 7 for shared auth rate limiting
 - `backend`: FastAPI API
 - `frontend`: React app served by Nginx
 
@@ -121,6 +123,7 @@ Login with the Candidate credentials and use the Candidate navigation.
 | Frontend | React 18, Vite, TypeScript, React Router, TanStack Query, Axios, Tailwind CSS, Radix/shadcn-style UI primitives, React Hook Form, Zod, Vitest |
 | Backend | Python 3.12, FastAPI, SQLAlchemy 2, Alembic, Pydantic v2, python-jose JWT, bcrypt, pytest |
 | Database | PostgreSQL 16 |
+| Cache / Rate Limiting | Redis 7 |
 | DevOps | Docker, Docker Compose, Nginx |
 
 ## Testing
@@ -136,8 +139,8 @@ python -m venv .venv
 
 Latest verified result:
 
-- `97 passed`
-- `96.05%` backend coverage
+- `98 passed`
+- `95.96%` backend coverage
 
 Frontend:
 
@@ -172,11 +175,12 @@ Latest verified result: build passed.
 - HR ownership isolation for jobs, applications, dashboard data, and message threads.
 - Passwords are hashed with bcrypt.
 - HR registration requires an invite code.
+- Auth rate limiting is backed by Redis in Docker, so counters are shared across backend workers.
 - Backend validation uses Pydantic schemas.
 - Frontend form validation uses Zod and React Hook Form.
 - Configuration is environment-driven; no real secrets are committed.
 - Database migrations run through Alembic.
-- PostgreSQL data persists through a named Docker volume.
+- PostgreSQL and Redis data persist through named Docker volumes.
 - Backend uses router/service/repository separation.
 - Tests cover auth, role guards, jobs, applications, dashboard, messaging, seed data, frontend API integration, forms, filters, and key UI workflows.
 
@@ -186,7 +190,7 @@ Latest verified result: build passed.
 - Messaging is persisted and reply-based, but not real-time WebSocket messaging.
 - Email notifications are not included.
 - JWT refresh tokens are not included; users re-login after token expiry.
-- Auth rate limiting is in-memory and suitable for this assessment scope. A shared store such as Redis would be preferable for multi-instance production.
+- Distributed abuse protection is limited to auth endpoints; broader API rate limiting could be added for production traffic.
 
 ## Claude Code Usage
 

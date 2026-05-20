@@ -20,7 +20,8 @@
       "Bash(python3 -m pytest tests/ -x --tb=short)",
       "Bash(npx tsc *)",
       "Bash(npm run *)",
-      "Bash(docker compose *)"
+      "Bash(docker compose *)",
+      "Bash(grep -E \"^\\\\.env$|\\\\.coverage$\")"
     ]
   }
 }

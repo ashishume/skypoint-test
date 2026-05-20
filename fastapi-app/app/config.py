@@ -48,6 +48,8 @@ class Settings(BaseSettings):
 
     RATE_LIMIT_AUTH_MAX_REQUESTS: int = Field(default=20, ge=1, le=10_000)
     RATE_LIMIT_AUTH_WINDOW_SECONDS: int = Field(default=60, ge=1, le=3600)
+    RATE_LIMIT_STORE: str = "memory"
+    REDIS_URL: str = "redis://localhost:6379/0"
 
     SEED_DATA: bool = False
     SEED_HR_EMAIL: Optional[str] = None
@@ -64,6 +66,15 @@ class Settings(BaseSettings):
         if v not in allowed:
             raise ValueError(f"ALGORITHM must be one of {allowed}")
         return v
+
+    @field_validator("RATE_LIMIT_STORE")
+    @classmethod
+    def _validate_rate_limit_store(cls, v: str) -> str:
+        allowed = {"memory", "redis"}
+        normalized = v.lower()
+        if normalized not in allowed:
+            raise ValueError(f"RATE_LIMIT_STORE must be one of {allowed}")
+        return normalized
 
     @property
     def cors_origins_list(self) -> List[str]:

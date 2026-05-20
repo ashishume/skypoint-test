@@ -16,6 +16,7 @@ from app.core.middleware import (
     RequestIdMiddleware,
     SecurityHeadersMiddleware,
 )
+from app.core.rate_limit import build_rate_limit_store
 from app.database import engine
 from app.routers import applications as applications_router
 from app.routers import auth as auth_router
@@ -34,9 +35,12 @@ logger = logging.getLogger("app")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting %s (env=%s)", settings.APP_NAME, settings.APP_ENV)
-    yield
-    logger.info("Shutting down %s", settings.APP_NAME)
-    engine.dispose()
+    try:
+        yield
+    finally:
+        logger.info("Shutting down %s", settings.APP_NAME)
+        await app.state.rate_limit_store.close()
+        engine.dispose()
 
 
 def create_app() -> FastAPI:
@@ -56,7 +60,8 @@ def create_app() -> FastAPI:
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type"],
     )
-    application.add_middleware(AuthRateLimitMiddleware)
+    application.state.rate_limit_store = build_rate_limit_store()
+    application.add_middleware(AuthRateLimitMiddleware, store=application.state.rate_limit_store)
     application.add_middleware(RequestIdMiddleware)
     application.add_middleware(SecurityHeadersMiddleware)
 

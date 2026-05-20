@@ -1,14 +1,12 @@
 """Application middleware for lightweight production hardening."""
-import time
 import uuid
-from collections import defaultdict, deque
-from typing import Deque, Dict, Tuple
 
 from fastapi import Request, Response, status
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import JSONResponse
 
 from app.config import settings
+from app.core.rate_limit import RateLimitStore
 
 
 class RequestIdMiddleware(BaseHTTPMiddleware):
@@ -52,16 +50,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 
 class AuthRateLimitMiddleware(BaseHTTPMiddleware):
-    """Small in-memory limiter for auth write endpoints.
+    """Rate-limit auth write endpoints using the configured shared store."""
 
-    This keeps the assessment self-contained without Redis. In multi-worker
-    deployments each worker has its own bucket, so a shared store should replace
-    this for high-scale production.
-    """
-
-    def __init__(self, app) -> None:
+    def __init__(self, app, store: RateLimitStore) -> None:
         super().__init__(app)
-        self._requests: Dict[Tuple[str, str], Deque[float]] = defaultdict(deque)
+        self._store = store
 
     async def dispatch(
         self,
@@ -72,7 +65,7 @@ class AuthRateLimitMiddleware(BaseHTTPMiddleware):
             f"{settings.API_V1_PREFIX}/auth/login",
             f"{settings.API_V1_PREFIX}/auth/register",
         }:
-            retry_after = self._retry_after(request)
+            retry_after = await self._retry_after(request)
             if retry_after is not None:
                 return JSONResponse(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -81,19 +74,11 @@ class AuthRateLimitMiddleware(BaseHTTPMiddleware):
                 )
         return await call_next(request)
 
-    def _retry_after(self, request: Request) -> int | None:
-        now = time.monotonic()
-        window = settings.RATE_LIMIT_AUTH_WINDOW_SECONDS
-        max_requests = settings.RATE_LIMIT_AUTH_MAX_REQUESTS
+    async def _retry_after(self, request: Request) -> int | None:
         client = request.client.host if request.client else "unknown"
-        key = (client, request.url.path)
-        bucket = self._requests[key]
-
-        while bucket and now - bucket[0] >= window:
-            bucket.popleft()
-
-        if len(bucket) >= max_requests:
-            return max(1, int(window - (now - bucket[0])))
-
-        bucket.append(now)
-        return None
+        key = f"{client}:{request.url.path}"
+        return await self._store.retry_after(
+            key,
+            max_requests=settings.RATE_LIMIT_AUTH_MAX_REQUESTS,
+            window_seconds=settings.RATE_LIMIT_AUTH_WINDOW_SECONDS,
+        )
