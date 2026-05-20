@@ -1,5 +1,7 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import type { Job } from "@/api/types";
 import { Button } from "@/components/ui/button";
@@ -35,5 +37,38 @@ describe("JobCard", () => {
     expect(screen.getByText("python")).toBeInTheDocument();
     expect(screen.getByText("3 Applicants")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Apply" })).toBeInTheDocument();
+  });
+
+  it("navigates via click and keyboard when an href is provided", async () => {
+    const user = userEvent.setup();
+
+    function LocationEcho() {
+      return <div data-testid="location">{useLocation().pathname}</div>;
+    }
+
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <JobCard job={{ ...job, applications_count: 1 }} href="/jobs/1" showApplicantsCount />
+        <LocationEcho />
+      </MemoryRouter>
+    );
+
+    const card = screen.getByRole("link", { name: /Platform Engineer/i });
+    expect(screen.getByText("1 Applicant")).toBeInTheDocument();
+
+    await user.click(card);
+    expect(screen.getByTestId("location")).toHaveTextContent("/jobs/1");
+  });
+
+  it("keeps non-linked cards passive and supports empty optional content", () => {
+    render(
+      <MemoryRouter>
+        <JobCard job={{ ...job, skills: [], applications_count: 0 }} />
+      </MemoryRouter>
+    );
+
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.queryByText("python")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Applicant/)).not.toBeInTheDocument();
   });
 });

@@ -38,6 +38,19 @@ describe("common components", () => {
     expect(onAction).toHaveBeenCalledTimes(1);
   });
 
+  it("renders empty states without optional actions", () => {
+    render(
+      <EmptyState
+        icon={BriefcaseBusiness}
+        title="No archived jobs"
+        description="Closed roles will appear here."
+      />
+    );
+
+    expect(screen.getByText("No archived jobs")).toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
   it("renders page headers with optional actions", () => {
     render(
       <PageHeader
@@ -52,5 +65,12 @@ describe("common components", () => {
     expect(screen.getByRole("heading", { name: "Jobs" })).toBeInTheDocument();
     expect(screen.getByText("Manage open roles.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "New job" })).toBeInTheDocument();
+  });
+
+  it("renders page headers with only required content", () => {
+    render(<PageHeader title="Dashboard" />);
+
+    expect(screen.getByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
+    expect(screen.queryByText("Workspace")).not.toBeInTheDocument();
   });
 });
