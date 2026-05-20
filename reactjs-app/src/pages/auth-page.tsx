@@ -1,55 +1,20 @@
 import { motion } from "framer-motion";
-import { BriefcaseBusiness, CheckCircle2, Loader2, Sparkles, UserRound } from "lucide-react";
+import { BriefcaseBusiness, CheckCircle2, Loader2, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { authApi, getApiError } from "@/api/client";
-import type { UserRole } from "@/api/types";
 import { useAuth } from "@/app/auth-context";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
-
-const demoAccounts: Array<{
-  role: UserRole;
-  title: string;
-  subtitle: string;
-  email: string;
-  password: string;
-  icon: typeof BriefcaseBusiness;
-  accent: string;
-  glow: string;
-}> = [
-  {
-    role: "hr",
-    title: "Recruiter workspace",
-    subtitle: "Post roles, review applicants, and track hiring velocity.",
-    email: import.meta.env.VITE_DEMO_HR_EMAIL ?? "",
-    password: import.meta.env.VITE_DEMO_HR_PASSWORD ?? "",
-    icon: BriefcaseBusiness,
-    accent: "from-blue-700 to-slate-950",
-    glow: "shadow-blue-900/20",
-  },
-  {
-    role: "candidate",
-    title: "Candidate workspace",
-    subtitle: "Search matched jobs, apply quickly, and manage your profile.",
-    email: import.meta.env.VITE_DEMO_CANDIDATE_EMAIL ?? "",
-    password: import.meta.env.VITE_DEMO_CANDIDATE_PASSWORD ?? "",
-    icon: UserRound,
-    accent: "from-emerald-600 to-slate-950",
-    glow: "shadow-emerald-900/20",
-  },
-];
 
 export default function AuthPage() {
   const { user, setSession } = useAuth();
-  const [selectedRole, setSelectedRole] = useState<UserRole>("hr");
-  const [email, setEmail] = useState(demoAccounts[0].email);
-  const [password, setPassword] = useState(demoAccounts[0].password);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -57,13 +22,6 @@ export default function AuthPage() {
 
   if (user) {
     return <Navigate to={user.role === "hr" ? "/hr" : "/candidate/jobs"} replace />;
-  }
-
-  function useDemoAccount(account: (typeof demoAccounts)[number]) {
-    setSelectedRole(account.role);
-    setEmail(account.email);
-    setPassword(account.password);
-    setError(null);
   }
 
   async function login(event: React.FormEvent<HTMLFormElement>) {
@@ -153,7 +111,7 @@ export default function AuthPage() {
           <Card className="rounded-xl border-white/80 bg-white/85 shadow-2xl backdrop-blur">
             <CardContent className="space-y-5 p-6 sm:p-8">
               <div>
-                <p className="text-sm font-bold uppercase tracking-wide text-blue-700">Demo login</p>
+                <p className="text-sm font-bold uppercase tracking-wide text-blue-700">Sign in</p>
                 <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">Sign in to RecruitFlow</h2>
               </div>
 
@@ -163,55 +121,13 @@ export default function AuthPage() {
                 </Alert>
               ) : null}
 
-              <div className="space-y-4">
-                {demoAccounts.map((account, index) => {
-                  const Icon = account.icon;
-                  const isSelected = selectedRole === account.role;
-                  return (
-                    <motion.button
-                      key={account.role}
-                      type="button"
-                      initial={{ opacity: 0, y: 14 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.35, delay: 0.18 + index * 0.08 }}
-                      whileHover={{ y: -3, scale: 1.01 }}
-                      whileTap={{ scale: 0.99 }}
-                      onClick={() => useDemoAccount(account)}
-                      className={cn(
-                        "group w-full overflow-hidden rounded-xl border border-slate-200 bg-white text-left shadow-lg transition-all disabled:cursor-not-allowed disabled:opacity-70",
-                        account.glow,
-                        isSelected && "border-blue-300 ring-2 ring-blue-100"
-                      )}
-                    >
-                      <div className={cn("h-1.5 bg-gradient-to-r", account.accent)} />
-                      <div className="grid gap-4 p-5 sm:grid-cols-[auto_1fr_auto] sm:items-center">
-                        <span className={cn("grid h-12 w-12 place-items-center rounded-lg bg-gradient-to-br text-white", account.accent)}>
-                          <Icon className="h-5 w-5" />
-                        </span>
-                        <span>
-                          <span className="block text-lg font-bold text-slate-950">{account.title}</span>
-                          <span className="mt-1 block text-sm font-medium leading-5 text-slate-600">{account.subtitle}</span>
-                          <span className="mt-3 block rounded-md bg-slate-50 px-3 py-2 text-xs font-bold text-slate-500">
-                            {account.email}
-                          </span>
-                        </span>
-                        <span className={cn(
-                          "hidden h-10 w-10 place-items-center rounded-full border text-slate-700 transition-all group-hover:border-blue-200 group-hover:bg-blue-50 group-hover:text-blue-700 sm:grid",
-                          isSelected ? "border-blue-200 bg-blue-50 text-blue-700" : "border-slate-200"
-                        )}>
-                          <CheckCircle2 className="h-4 w-4" />
-                        </span>
-                      </div>
-                    </motion.button>
-                  );
-                })}
-              </div>
-
-              <form className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm" onSubmit={login}>
+              <form className="space-y-4" onSubmit={login}>
                 <FormField label="Email" required>
                   <Input
                     type="email"
                     autoComplete="email"
+                    placeholder="Enter email"
+                    required
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
                   />
@@ -220,6 +136,8 @@ export default function AuthPage() {
                   <Input
                     type="password"
                     autoComplete="current-password"
+                    placeholder="Enter password"
+                    required
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
                   />
@@ -229,10 +147,6 @@ export default function AuthPage() {
                   Login
                 </Button>
               </form>
-
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm font-medium text-slate-600">
-                Demo credentials are prefilled for display. You can edit them, then click Login.
-              </div>
             </CardContent>
           </Card>
         </motion.section>
