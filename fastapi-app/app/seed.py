@@ -20,6 +20,79 @@ from app.models.user import User, UserRole
 
 logger = logging.getLogger(__name__)
 
+_DEMO_CANDIDATES = [
+    {
+        "email": "riya.frontend@test.com",
+        "full_name": "Riya Sharma",
+        "resume_url": "https://example.com/riya-sharma-resume.pdf",
+        "skills": ["react", "typescript", "tailwind", "frontend", "accessibility"],
+        "work_experience": (
+            "Frontend engineer with 4 years of experience building React design systems, "
+            "dashboard workflows, accessibility improvements, and performance-focused UI."
+        ),
+        "salary_min": 95000,
+        "salary_max": 150000,
+        "experience_years": 4,
+        "preferred_roles": ["frontend engineer", "react engineer", "ui engineer"],
+    },
+    {
+        "email": "arjun.data@test.com",
+        "full_name": "Arjun Mehta",
+        "resume_url": "https://example.com/arjun-mehta-resume.pdf",
+        "skills": ["python", "sql", "analytics", "pipelines", "postgresql"],
+        "work_experience": (
+            "Data engineer focused on SQL modelling, Python ETL, analytics pipelines, "
+            "and reporting systems for operational teams."
+        ),
+        "salary_min": 100000,
+        "salary_max": 165000,
+        "experience_years": 5,
+        "preferred_roles": ["data engineer", "analytics engineer", "etl developer"],
+    },
+    {
+        "email": "meera.design@test.com",
+        "full_name": "Meera Iyer",
+        "resume_url": "https://example.com/meera-iyer-resume.pdf",
+        "skills": ["ux research", "product strategy", "analytics", "figma", "usability testing"],
+        "work_experience": (
+            "Product designer with 6 years of experience leading UX research, product "
+            "strategy, usability testing, and dashboard design for SaaS teams."
+        ),
+        "salary_min": 125000,
+        "salary_max": 185000,
+        "experience_years": 6,
+        "preferred_roles": ["senior product designer", "ux lead", "product design lead"],
+    },
+    {
+        "email": "kabir.backend@test.com",
+        "full_name": "Kabir Khan",
+        "resume_url": "https://example.com/kabir-khan-resume.pdf",
+        "skills": ["python", "fastapi", "postgresql", "redis", "docker"],
+        "work_experience": (
+            "Backend engineer experienced in FastAPI services, PostgreSQL schemas, Redis "
+            "rate limiting, Docker deployments, and secure API integrations."
+        ),
+        "salary_min": 110000,
+        "salary_max": 190000,
+        "experience_years": 5,
+        "preferred_roles": ["backend engineer", "api engineer", "platform engineer"],
+    },
+    {
+        "email": "nisha.qa@test.com",
+        "full_name": "Nisha Rao",
+        "resume_url": "https://example.com/nisha-rao-resume.pdf",
+        "skills": ["testing", "automation", "playwright", "typescript", "quality"],
+        "work_experience": (
+            "QA automation engineer building end-to-end test suites, regression workflows, "
+            "and quality gates for web applications."
+        ),
+        "salary_min": 85000,
+        "salary_max": 135000,
+        "experience_years": 3,
+        "preferred_roles": ["qa automation engineer", "test engineer", "quality engineer"],
+    },
+]
+
 
 def _ensure_user(
     db: Session,
@@ -50,7 +123,18 @@ def _ensure_user(
     return user
 
 
-def _ensure_profile(db: Session, candidate: User) -> CandidateProfile:
+def _ensure_profile(
+    db: Session,
+    candidate: User,
+    *,
+    resume_url: str = "https://example.com/recruitflow-demo-resume.pdf",
+    skills: list[str] | None = None,
+    work_experience: str | None = None,
+    salary_min: int = 120000,
+    salary_max: int = 180000,
+    experience_years: int = 5,
+    preferred_roles: list[str] | None = None,
+) -> CandidateProfile:
     existing = db.execute(
         select(CandidateProfile).where(CandidateProfile.candidate_id == candidate.id)
     ).scalar_one_or_none()
@@ -59,23 +143,50 @@ def _ensure_profile(db: Session, candidate: User) -> CandidateProfile:
 
     profile = CandidateProfile(
         candidate_id=candidate.id,
-        resume_url="https://example.com/recruitflow-demo-resume.pdf",
-        skills=["react", "typescript", "product strategy", "ux research", "analytics"],
-        work_experience=(
+        resume_url=resume_url,
+        skills=skills or ["react", "typescript", "product strategy", "ux research", "analytics"],
+        work_experience=work_experience or (
             "Senior product designer with 5 years of experience building hiring, "
             "analytics, and workflow products. Comfortable partnering with engineering "
             "teams on React dashboards, research synthesis, and product strategy."
         ),
-        salary_min=120000,
-        salary_max=180000,
-        experience_years=5,
-        preferred_roles=["senior product designer", "product strategy lead", "ux lead"],
+        salary_min=salary_min,
+        salary_max=salary_max,
+        experience_years=experience_years,
+        preferred_roles=preferred_roles or ["senior product designer", "product strategy lead", "ux lead"],
     )
     db.add(profile)
     db.commit()
     db.refresh(profile)
     logger.info("Created demo candidate profile for '%s'.", candidate.email)
     return profile
+
+
+def _ensure_dummy_candidates(db: Session) -> list[User]:
+    candidates: list[User] = []
+    for candidate_data in _DEMO_CANDIDATES:
+        candidate = _ensure_user(
+            db,
+            candidate_data["email"],
+            "Candidate@1234",
+            candidate_data["full_name"],
+            UserRole.CANDIDATE,
+        )
+        if candidate is None:
+            continue
+        _ensure_profile(
+            db,
+            candidate,
+            resume_url=candidate_data["resume_url"],
+            skills=candidate_data["skills"],
+            work_experience=candidate_data["work_experience"],
+            salary_min=candidate_data["salary_min"],
+            salary_max=candidate_data["salary_max"],
+            experience_years=candidate_data["experience_years"],
+            preferred_roles=candidate_data["preferred_roles"],
+        )
+        candidates.append(candidate)
+    return candidates
 
 
 def _ensure_job(
@@ -230,6 +341,7 @@ def _ensure_demo_workspace(db: Session, hr: User | None, candidate: User | None)
     )
     _ensure_application(db, designer_job, candidate)
     _ensure_message_thread(db, designer_job, candidate, hr)
+    _ensure_dummy_candidates(db)
 
 
 def seed_database() -> None:

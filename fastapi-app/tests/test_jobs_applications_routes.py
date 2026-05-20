@@ -287,6 +287,82 @@ class TestJobRoutes:
         assert update_response.status_code == 403
         assert delete_response.status_code == 403
 
+    def test_hr_can_search_potential_candidates_for_own_job(
+        self,
+        client: TestClient,
+        db: Session,
+        hr_user: User,
+        candidate_user: User,
+        hr_token: str,
+    ):
+        job = create_job(db, hr_user, title="React Product Engineer", skills=["react", "typescript"])
+        create_application(db, job, candidate_user, status=ApplicationStatus.REVIEWED)
+        db.add(
+            CandidateProfile(
+                candidate_id=candidate_user.id,
+                resume_url="https://example.com/react-resume.pdf",
+                skills=["react", "typescript", "product"],
+                work_experience="Built React dashboards for hiring workflows.",
+                salary_min=120000,
+                salary_max=180000,
+                experience_years=5,
+                preferred_roles=["React Product Engineer"],
+            )
+        )
+        other_candidate = User(
+            email="data-candidate@test.com",
+            hashed_password=hash_password("Candidate@123"),
+            full_name="Data Candidate",
+            role=UserRole.CANDIDATE,
+        )
+        db.add(other_candidate)
+        db.commit()
+        db.refresh(other_candidate)
+        db.add(
+            CandidateProfile(
+                candidate_id=other_candidate.id,
+                skills=["python", "sql"],
+                work_experience="Built analytics pipelines.",
+                salary_min=100000,
+                salary_max=160000,
+                experience_years=4,
+                preferred_roles=["Data Engineer"],
+            )
+        )
+        other_hr = User(
+            email="potential-owner@test.com",
+            hashed_password=hash_password("OtherHr@123"),
+            full_name="Potential Owner",
+            role=UserRole.HR,
+        )
+        db.add(other_hr)
+        db.commit()
+        db.refresh(other_hr)
+        other_token = login(client, email=other_hr.email, password="OtherHr@123")
+
+        response = client.get(
+            f"{JOBS}/{job.id}/potential-candidates",
+            params={"search": "react"},
+            headers=auth_header(hr_token),
+        )
+        forbidden = client.get(
+            f"{JOBS}/{job.id}/potential-candidates",
+            headers=auth_header(other_token),
+        )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["total"] == 1
+        item = body["items"][0]
+        assert item["candidate"]["email"] == candidate_user.email
+        assert item["candidate_profile"]["skills"] == ["react", "typescript", "product"]
+        assert item["match_score"] > 0
+        assert item["matched_skills"] == ["react", "typescript"]
+        assert item["has_applied"] is True
+        assert item["application_status"] == "reviewed"
+        assert isinstance(item["application_id"], int)
+        assert forbidden.status_code == 403
+
 
 class TestApplicationRoutes:
     def test_candidate_can_apply_and_list_own_applications(

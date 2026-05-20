@@ -83,8 +83,12 @@ def get_auth_service(repo: UserRepoDep) -> AuthService:
     return AuthService(repo)
 
 
-def get_job_service(repo: JobRepoDep) -> JobService:
-    return JobService(repo)
+def get_job_service(
+    repo: JobRepoDep,
+    profile_repo: CandidateProfileRepoDep,
+    application_repo: ApplicationRepoDep,
+) -> JobService:
+    return JobService(repo, profile_repo, application_repo)
 
 
 def get_application_service(
@@ -107,8 +111,9 @@ def get_message_service(
     message_repo: MessageRepoDep,
     job_repo: JobRepoDep,
     application_repo: ApplicationRepoDep,
+    user_repo: UserRepoDep,
 ) -> MessageService:
-    return MessageService(message_repo, job_repo, application_repo)
+    return MessageService(message_repo, job_repo, application_repo, user_repo)
 
 
 UserServiceDep = Annotated[UserService, Depends(get_user_service)]

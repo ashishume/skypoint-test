@@ -1,9 +1,10 @@
 """Message business rules for HR/candidate conversations."""
 from app.core.exceptions import BadRequestError, ForbiddenError, NotFoundError
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.repositories.application_repository import ApplicationRepository
 from app.repositories.job_repository import JobRepository
 from app.repositories.message_repository import MessageThreadRepository
+from app.repositories.user_repository import UserRepository
 from app.schemas.message import (
     HrMessageCreate,
     MessageReplyCreate,
@@ -17,10 +18,12 @@ class MessageService:
         message_repo: MessageThreadRepository,
         job_repo: JobRepository,
         application_repo: ApplicationRepository,
+        user_repo: UserRepository,
     ) -> None:
         self.message_repo = message_repo
         self.job_repo = job_repo
         self.application_repo = application_repo
+        self.user_repo = user_repo
 
     def send_from_hr(self, payload: HrMessageCreate, hr: User) -> MessageThreadResponse:
         body = payload.body.strip()
@@ -31,12 +34,9 @@ class MessageService:
         if job.created_by_id != hr.id:
             raise ForbiddenError("You can only message candidates for your own jobs.")
 
-        application = self.application_repo.get_by_job_and_candidate(
-            job_id=payload.job_id,
-            candidate_id=payload.candidate_id,
-        )
-        if application is None:
-            raise BadRequestError("This candidate has not applied to the selected job.")
+        candidate = self.user_repo.get_or_404(payload.candidate_id, resource_name="Candidate")
+        if candidate.role != UserRole.CANDIDATE or not candidate.is_active:
+            raise BadRequestError("Messages can only be sent to active candidate users.")
 
         thread = self.message_repo.get_or_create(
             job_id=payload.job_id,

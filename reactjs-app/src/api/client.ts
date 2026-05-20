@@ -15,6 +15,7 @@ import type {
   JobType,
   MessageThread,
   Page,
+  PotentialCandidate,
   TokenResponse,
   User,
   UserRole,
@@ -107,6 +108,16 @@ export const jobsApi = {
   ) => {
     const { data } = await api.get<Page<ApplicationWithCandidateProfile>>(
       `/jobs/${jobId}/applications`,
+      { params }
+    );
+    return data;
+  },
+  potentialCandidates: async (
+    jobId: number,
+    params: { search?: string; limit?: number; offset?: number } = {}
+  ) => {
+    const { data } = await api.get<Page<PotentialCandidate>>(
+      `/jobs/${jobId}/potential-candidates`,
       { params }
     );
     return data;

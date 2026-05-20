@@ -25,3 +25,4 @@ class UserPublic(BaseModel):
     id: int
     email: EmailStr
     full_name: str
+    role: UserRole

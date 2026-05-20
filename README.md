@@ -78,7 +78,7 @@ These users are seeded automatically when the stack starts.
 | HR | `admin@test.com` | `Admin@1234` |
 | Candidate | `user@test.com` | `User@1234` |
 
-The seed also creates demo jobs, a candidate profile, one application, and a starter message thread so both roles have data immediately.
+The seed also creates demo jobs, a starter application/message thread, and a small candidate pool with searchable profiles so HR can test potential-candidate matching immediately.
 
 ## Feature Walkthrough
 
@@ -92,6 +92,7 @@ Login with the HR credentials and use the HR navigation.
 | Create, edit, close, and delete jobs | `/hr/jobs` |
 | Search and filter HR-owned jobs | `/hr/jobs` |
 | View applicants for a job | `/hr/jobs` |
+| Search potential candidates for a role | `/hr/jobs/{jobId}` potential candidates panel |
 | Update applicant status | applicant table/status dropdown |
 | View candidate profile and match score | applicant profile dialog |
 | Message candidates who applied to HR-owned jobs | candidate profile dialog or `/hr/messages` |
@@ -139,8 +140,8 @@ python -m venv .venv
 
 Latest verified result:
 
-- `98 passed`
-- `95.96%` backend coverage
+- `100 passed`
+- `95.92%` backend coverage
 
 Frontend:
 
@@ -182,7 +183,7 @@ Latest verified result: build passed.
 - Database migrations run through Alembic.
 - PostgreSQL and Redis data persist through named Docker volumes.
 - Backend uses router/service/repository separation.
-- Tests cover auth, role guards, jobs, applications, dashboard, messaging, seed data, frontend API integration, forms, filters, and key UI workflows.
+- Tests cover auth, role guards, jobs, applications, HR candidate discovery, dashboard, messaging, seed data, frontend API integration, forms, filters, and key UI workflows.
 
 ## Known Limitations
 

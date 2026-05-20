@@ -112,6 +112,17 @@ export interface ApplicationWithCandidateProfile extends ApplicationWithJobAndCa
   match_reason: string;
 }
 
+export interface PotentialCandidate {
+  candidate: PublicUser;
+  candidate_profile: CandidateProfile;
+  match_score: number;
+  matched_skills: string[];
+  match_reason: string;
+  has_applied: boolean;
+  application_status: ApplicationStatus | null;
+  application_id: number | null;
+}
+
 export interface HiringVelocityBucket {
   label: string;
   start_date: string;

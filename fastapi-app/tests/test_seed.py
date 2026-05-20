@@ -2,6 +2,7 @@
 from unittest.mock import patch
 
 from app import seed as seed_module
+from app.models.candidate_profile import CandidateProfile
 from app.models.user import User, UserRole
 
 
@@ -63,6 +64,9 @@ class TestSeedDatabase:
         roles = {u.email: u.role for u in users}
         assert roles["seedhr@test.com"] == UserRole.HR
         assert roles["seeduser@test.com"] == UserRole.CANDIDATE
+        assert "riya.frontend@test.com" in emails
+        assert "kabir.backend@test.com" in emails
+        assert db.query(CandidateProfile).count() == 6
         assert wrapper.closed is True
 
     def test_seed_is_idempotent(self, db):
@@ -76,7 +80,8 @@ class TestSeedDatabase:
             seed_module.seed_database()
             seed_module.seed_database()
 
-        assert db.query(User).count() == 2
+        assert db.query(User).count() == 7
+        assert db.query(CandidateProfile).count() == 6
 
     def test_seed_skips_when_credentials_missing(self, db):
         wrapper = _patched_session(db)

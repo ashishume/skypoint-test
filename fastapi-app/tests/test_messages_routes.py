@@ -131,7 +131,7 @@ class TestMessagesRoutes:
             "Great, I sent an invite.",
         ]
 
-    def test_hr_cannot_message_candidate_without_application(
+    def test_hr_can_invite_candidate_without_application(
         self,
         client: TestClient,
         db: Session,
@@ -144,6 +144,25 @@ class TestMessagesRoutes:
         response = client.post(
             f"{MESSAGES}/hr",
             json={"candidate_id": candidate_user.id, "job_id": job.id, "body": "Checking in."},
+            headers=auth_header(hr_token),
+        )
+
+        assert response.status_code == 201
+        assert response.json()["candidate"]["email"] == candidate_user.email
+        assert response.json()["messages"][0]["body"] == "Checking in."
+
+    def test_hr_cannot_message_non_candidate_user(
+        self,
+        client: TestClient,
+        db: Session,
+        hr_user: User,
+        hr_token: str,
+    ):
+        job = create_job(db, hr_user)
+
+        response = client.post(
+            f"{MESSAGES}/hr",
+            json={"candidate_id": hr_user.id, "job_id": job.id, "body": "Checking in."},
             headers=auth_header(hr_token),
         )
 

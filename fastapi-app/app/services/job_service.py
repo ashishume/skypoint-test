@@ -5,13 +5,25 @@ from app.core.exceptions import BadRequestError, ForbiddenError, NotFoundError
 from app.core.pagination import Page, PaginationParams
 from app.models.job import JobPosting, JobStatus, JobType
 from app.models.user import User
+from app.repositories.application_repository import ApplicationRepository
+from app.repositories.candidate_profile_repository import CandidateProfileRepository
 from app.repositories.job_repository import JobRepository
+from app.schemas.candidate_profile import PotentialCandidate
 from app.schemas.job import JobCreate, JobResponse, JobUpdate
+from app.services.candidate_profile_service import CandidateProfileService
+from app.services.recommendation import score_job
 
 
 class JobService:
-    def __init__(self, job_repo: JobRepository) -> None:
+    def __init__(
+        self,
+        job_repo: JobRepository,
+        profile_repo: CandidateProfileRepository | None = None,
+        application_repo: ApplicationRepository | None = None,
+    ) -> None:
         self.job_repo = job_repo
+        self.profile_repo = profile_repo
+        self.application_repo = application_repo
 
     def create(self, payload: JobCreate, hr_user: User) -> JobPosting:
         job = JobPosting(
@@ -96,3 +108,59 @@ class JobService:
     def delete(self, job_id: int, hr_user: User) -> None:
         job = self.get_for_hr(job_id, hr_user)
         self.job_repo.delete(job)
+
+    def potential_candidates(
+        self,
+        job_id: int,
+        hr_user: User,
+        pagination: PaginationParams,
+        *,
+        search: Optional[str] = None,
+    ) -> Page[PotentialCandidate]:
+        if self.profile_repo is None or self.application_repo is None:
+            raise RuntimeError("Candidate profile and application repositories are required.")
+
+        job = self.get_for_hr(job_id, hr_user)
+        profiles = self.profile_repo.list_searchable_candidates(search=search)
+        applications_by_candidate = self.application_repo.applications_for_job_candidate_ids(
+            job_id=job.id,
+            candidate_ids=[profile.candidate_id for profile in profiles],
+        )
+        candidates = [
+            self._potential_candidate_response(job, profile, applications_by_candidate.get(profile.candidate_id))
+            for profile in profiles
+        ]
+        candidates.sort(
+            key=lambda candidate: (
+                -candidate.match_score,
+                -candidate.candidate_profile.profile_strength,
+                candidate.candidate.full_name.lower(),
+            )
+        )
+        total = len(candidates)
+        page_items = candidates[pagination.offset:pagination.offset + pagination.limit]
+        return Page[PotentialCandidate].build(
+            items=page_items,
+            total=total,
+            params=pagination,
+        )
+
+    @staticmethod
+    def _potential_candidate_response(job: JobPosting, profile, application) -> PotentialCandidate:
+        recommendation = score_job(
+            job,
+            profile=profile,
+            profile_skills=profile.skills,
+            preferred_roles=profile.preferred_roles,
+            application_status=application.status if application is not None else None,
+        )
+        return PotentialCandidate(
+            candidate=profile.candidate,
+            candidate_profile=CandidateProfileService._to_response(profile),
+            match_score=recommendation.match_score,
+            matched_skills=recommendation.matched_skills,
+            match_reason=recommendation.reason,
+            has_applied=application is not None,
+            application_status=application.status if application is not None else None,
+            application_id=application.id if application is not None else None,
+        )

@@ -159,7 +159,7 @@ export default function CandidateJobsPage() {
     <>
       <PageHeader
         eyebrow="Candidate workspace"
-        title={`Good Morning, ${firstName}`}
+        title={`Welcome, ${firstName}`}
         description="Here is what's happening with your job search today."
       />
       <section className="space-y-8 px-4 py-6 sm:px-6 lg:px-8">

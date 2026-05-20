@@ -93,7 +93,7 @@ describe("dashboard components", () => {
       </>
     );
 
-    expect(screen.getByRole("heading", { name: /Good Morning, HR/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Welcome, HR/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Active Jobs/i })).toHaveAttribute("href", "/hr/jobs?status=open");
     expect(screen.getByRole("link", { name: /Custom/i })).toHaveAttribute("href", "/hr/jobs");
   });

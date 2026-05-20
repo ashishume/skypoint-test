@@ -15,6 +15,7 @@ from app.models.application import ApplicationStatus
 from app.models.job import JobStatus, JobType
 from app.models.user import UserRole
 from app.schemas.application import ApplicationWithCandidateProfile
+from app.schemas.candidate_profile import PotentialCandidate
 from app.schemas.job import JobCreate, JobResponse, JobUpdate
 
 router = APIRouter()
@@ -128,3 +129,18 @@ def list_job_applications(
     status_filter: Annotated[Optional[ApplicationStatus], Query(alias="status")] = None,
 ) -> Page[ApplicationWithCandidateProfile]:
     return service.list_for_job(job_id, hr, pagination, status=status_filter)
+
+
+@router.get(
+    "/{job_id}/potential-candidates",
+    response_model=Page[PotentialCandidate],
+    summary="Find candidate profiles that match an HR user's job",
+)
+def list_potential_candidates(
+    job_id: int,
+    hr: HrUser,
+    service: JobServiceDep,
+    pagination: Annotated[PaginationParams, Depends()],
+    search: Annotated[Optional[str], Query(max_length=255)] = None,
+) -> Page[PotentialCandidate]:
+    return service.potential_candidates(job_id, hr, pagination, search=search)

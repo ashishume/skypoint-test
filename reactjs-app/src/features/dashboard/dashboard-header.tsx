@@ -11,7 +11,9 @@ export function DashboardHeader() {
       transition={{ duration: 0.35 }}
       className="space-y-2"
     >
-      <h1 className="text-3xl font-bold tracking-tight text-[#091426] sm:text-4xl">Good Morning, {firstName}</h1>
+      <h1 className="text-3xl font-bold tracking-tight text-[#091426] sm:text-4xl">
+        Welcome, {firstName}
+      </h1>
       <p className="text-base font-medium text-slate-600">
         Here&apos;s what&apos;s happening with your recruitment funnel today.
       </p>

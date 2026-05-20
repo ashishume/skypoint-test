@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator, mod
 
 from app.models.application import ApplicationStatus
 from app.schemas.job import JobResponse
+from app.schemas.user import UserPublic
 
 
 def normalize_list(values: List[str]) -> List[str]:
@@ -73,3 +74,14 @@ class JobRecommendation(BaseModel):
     reason: str
     has_applied: bool = False
     application_status: Optional[ApplicationStatus] = None
+
+
+class PotentialCandidate(BaseModel):
+    candidate: UserPublic
+    candidate_profile: CandidateProfileResponse
+    match_score: int
+    matched_skills: List[str]
+    match_reason: str
+    has_applied: bool = False
+    application_status: Optional[ApplicationStatus] = None
+    application_id: Optional[int] = None

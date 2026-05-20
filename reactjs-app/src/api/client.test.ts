@@ -102,10 +102,12 @@ describe("api client", () => {
     await jobsApi.update(1, { status: "closed" });
     await jobsApi.remove(1);
     await jobsApi.applications(1, { status: "pending" });
+    await jobsApi.potentialCandidates(1, { search: "react", limit: 5 });
 
     expect(get).toHaveBeenCalledWith("/jobs", { params: { search: "api" } });
     expect(get).toHaveBeenCalledWith("/jobs/1");
     expect(get).toHaveBeenCalledWith("/jobs/1/applications", { params: { status: "pending" } });
+    expect(get).toHaveBeenCalledWith("/jobs/1/potential-candidates", { params: { search: "react", limit: 5 } });
     expect(post).toHaveBeenCalledWith("/jobs", expect.any(Object));
     expect(put).toHaveBeenCalledWith("/jobs/1", { status: "closed" });
     expect(remove).toHaveBeenCalledWith("/jobs/1");

@@ -38,6 +38,19 @@ class ApplicationRepository(BaseRepository[Application]):
         ).all()
         return {int(job_id): status for job_id, status in rows}
 
+    def applications_for_job_candidate_ids(
+        self, *, job_id: int, candidate_ids: List[int]
+    ) -> Dict[int, Application]:
+        if not candidate_ids:
+            return {}
+        applications = self.db.execute(
+            select(Application).where(
+                Application.job_id == job_id,
+                Application.candidate_id.in_(candidate_ids),
+            )
+        ).scalars().all()
+        return {application.candidate_id: application for application in applications}
+
     def list_for_candidate(
         self,
         *,
